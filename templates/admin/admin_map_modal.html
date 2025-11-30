@@ -1,0 +1,110 @@
+{% load static %}
+
+<!-- Подключаем Leaflet -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<style>
+.modal-bg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.55);
+    display: none;
+    z-index: 2000;
+}
+
+.modal-window {
+    width: 70%;
+    height: 70%;
+    background: white;
+    position: absolute;
+    top: 15%;
+    left: 15%;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 0 20px rgba(0,0,0,0.4);
+}
+
+#admin-map {
+    width: 100%;
+    height: 100%;
+}
+.modal-header {
+    padding: 10px;
+    font-size: 16px;
+    background: #2c3e50;
+    color: white;
+}
+.modal-close {
+    float: right;
+    cursor: pointer;
+    font-size: 18px;
+}
+</style>
+
+
+<div id="modal-bg" class="modal-bg">
+    <div class="modal-window">
+        <div class="modal-header">
+            Выбор точки на карте
+            <span class="modal-close" onclick="closeMapModal()">×</span>
+        </div>
+        <div id="admin-map"></div>
+    </div>
+</div>
+
+
+<script>
+// Открыть окно
+function openMapModal(latFieldId, lngFieldId) {
+    window.latField = document.getElementById(latFieldId);
+    window.lngField = document.getElementById(lngFieldId);
+
+    document.getElementById("modal-bg").style.display = "block";
+
+    setTimeout(initMap, 50);
+}
+
+// Закрыть окно
+function closeMapModal() {
+    document.getElementById("modal-bg").style.display = "none";
+}
+
+
+// ИНИЦИАЛИЗАЦИЯ КАРТЫ
+function initMap() {
+    if (window.mapInit) return;
+
+    window.mapInit = true;
+
+    const map = L.map('admin-map').setView([40.285, 69.631], 13);
+
+    // ArcGIS Satellite
+    L.tileLayer(
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        { attribution: "© ESRI" }
+    ).addTo(map);
+
+
+    let marker = null;
+
+    map.on("click", function (e) {
+        const lat = e.latlng.lat.toFixed(6);
+        const lng = e.latlng.lng.toFixed(6);
+
+        // ставим маркер
+        if (marker) map.removeLayer(marker);
+        marker = L.marker([lat, lng]).addTo(map);
+
+        // Заполняем поля в форме
+        window.latField.value = lat;
+        window.lngField.value = lng;
+
+        closeMapModal();
+    });
+}
+
+</script>

@@ -1,0 +1,56 @@
+<div id="latlngModal" class="modal" style="display:none;
+    position:fixed; top:0; left:0; width:100%; height:100%;
+    background:rgba(0,0,0,0.5); z-index:9999;">
+
+    <div style="position:absolute; top:50%; left:50%;
+        transform:translate(-50%, -50%);
+        width:80%; height:80%; background:white; border-radius:10px;">
+
+        <div id="map" style="height:100%; width:100%;"></div>
+
+        <button onclick="closeLatLngModal()" 
+            style="position:absolute; top:10px; right:10px;">Закрыть</button>
+
+    </div>
+</div>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+let latField = null;
+
+function openLatLngModal(fieldId) {
+    latField = document.getElementById(fieldId);
+
+    document.getElementById("latlngModal").style.display = "block";
+
+    setTimeout(() => {
+        if (!window.map) {
+            window.map = L.map('map').setView([38.56, 68.78], 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap'
+            }).addTo(window.map);
+
+            window.map.on("click", function (e) {
+                let lat = e.latlng.lat.toFixed(6);
+                let lng = e.latlng.lng.toFixed(6);
+
+                // latField = lat
+                latField.value = lat;
+
+                // find matching lng field
+                let lngField = document.getElementById(latField.id.replace("lat", "lng"));
+                if (lngField) lngField.value = lng;
+
+                closeLatLngModal();
+            });
+        }
+        window.map.invalidateSize();
+    }, 200);
+}
+
+function closeLatLngModal() {
+    document.getElementById("latlngModal").style.display = "none";
+}
+</script>

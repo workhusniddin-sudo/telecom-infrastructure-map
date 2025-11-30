@@ -1,602 +1,467 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Карта телеком инфраструктуры</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f5f5f5;
-        }
-        
-        #map { 
-            height: 100vh; 
-            width: 100%;
-        }
-        
-        /* Панель управления */
-        .control-panel {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            background: white;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-            z-index: 1000;
-            width: 380px;
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-        
-        .panel-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #e0e0e0;
-        }
-        
-        .panel-header h2 {
-            color: #2c3e50;
-            font-size: 1.4em;
-            margin: 0;
-        }
-        
-        .search-section {
-            margin-bottom: 20px;
-        }
-        
-        .search-box {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 10px;
-        }
-        
-        input[type="text"], select {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 14px;
-            transition: border-color 0.3s;
-        }
-        
-        input[type="text"]:focus, select:focus {
-            outline: none;
-            border-color: #3498db;
-        }
-        
-        .btn {
-            background: #3498db;
-            color: white;
-            border: none;
-            padding: 12px 20px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .btn:hover {
-            background: #2980b9;
-            transform: translateY(-1px);
-        }
-        
-        .btn-success {
-            background: #27ae60;
-        }
-        
-        .btn-success:hover {
-            background: #219a52;
-        }
-        
-        .btn-danger {
-            background: #e74c3c;
-        }
-        
-        .btn-danger:hover {
-            background: #c0392b;
-        }
-        
-        .filters {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
-        
-        .result-box {
-            margin-top: 15px;
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            border-left: 4px solid #3498db;
-            font-size: 14px;
-            line-height: 1.5;
-        }
-        
-        .result-box.success {
-            border-left-color: #27ae60;
-            background: #d5f4e6;
-        }
-        
-        .result-box.error {
-            border-left-color: #e74c3c;
-            background: #fadbd8;
-        }
-        
-        .stats {
-            background: #34495e;
-            color: white;
-            padding: 12px;
-            border-radius: 8px;
-            margin-top: 15px;
-            font-size: 12px;
-        }
-        
-        .stats-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-        }
-        
-        .stat-item {
-            text-align: center;
-        }
-        
-        .stat-value {
-            font-size: 18px;
-            font-weight: bold;
-            color: #3498db;
-        }
-        
-        .legend {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            background: white;
-            padding: 15px;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-            z-index: 1000;
-            max-width: 250px;
-        }
-        
-        .legend h4 {
-            margin: 0 0 10px 0;
-            color: #2c3e50;
-            font-size: 14px;
-        }
-        
-        .legend-item {
-            display: flex;
-            align-items: center;
-            margin: 6px 0;
-            font-size: 12px;
-        }
-        
-        .legend-color {
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            margin-right: 8px;
-            border: 2px solid white;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-        }
-        
-        .object-popup {
-            max-width: 300px;
-        }
-        
-        .popup-header {
-            font-weight: bold;
-            color: #2c3e50;
-            margin-bottom: 8px;
-            font-size: 16px;
-        }
-        
-        .popup-details {
-            font-size: 13px;
-            line-height: 1.4;
-        }
-        
-        .popup-status {
-            display: inline-block;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: bold;
-            margin-top: 5px;
-        }
-        
-        .status-active { background: #d5f4e6; color: #27ae60; }
-        .status-inactive { background: #fadbd8; color: #e74c3c; }
-        .status-maintenance { background: #fdebd0; color: #f39c12; }
-        
-        .loading {
-            display: none;
-            text-align: center;
-            padding: 10px;
-            color: #7f8c8d;
-        }
-        
-        .loading.spinner {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #3498db;
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Телеком карта — Худжанд (ArcGIS Satellite + Leaflet)</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- MarkerCluster CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <!-- Leaflet.draw CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+
+  <style>
+    html,body { height:100%; margin:0; font-family: "Segoe UI", Tahoma, Verdana, sans-serif; background:#f5f5f5; }
+    #map { width:100%; height:100vh; }
+    /* Control panel */
+    .control-panel{
+      position:absolute; left:12px; top:12px; z-index:1100;
+      width:380px; background:#fff; padding:16px; border-radius:12px;
+      box-shadow:0 6px 24px rgba(0,0,0,0.12);
+      max-height:88vh; overflow:auto;
+    }
+    .panel-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+    .panel-header h2 { margin:0; font-size:1.2rem; color:#243447; }
+    input[type=text], select { width:100%; padding:10px; border-radius:8px; border:1px solid #e6e9ee; margin-bottom:8px; }
+    .btn { display:inline-flex; align-items:center; gap:8px; background:#3498db; color:#fff; padding:9px 12px; border-radius:8px; border:none; cursor:pointer; font-weight:600; }
+    .btn:hover { transform:translateY(-1px) }
+    .btn.small { padding:6px 8px; font-size:0.9rem }
+    .legend { position:absolute; left:12px; bottom:12px; z-index:1100; background:#fff; padding:12px; border-radius:10px; box-shadow:0 6px 18px rgba(0,0,0,0.12); font-size:13px }
+    .legend-item { display:flex; align-items:center; gap:8px; margin:6px 0 }
+    .stat-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; background:#2f3b46; color:#fff; padding:8px; border-radius:8px; font-size:13px }
+    .stat-value { font-weight:700; font-size:1.05rem; color:#7bd389 }
+    .floating-actions { margin-top:10px; display:flex; gap:8px; flex-wrap:wrap }
+    /* small helpers */
+    .muted { color:#6b7280; font-size:0.95rem }
+    .draw-export { margin-top:10px; display:flex; gap:8px }
+    pre#geojsonOut { max-height:150px; overflow:auto; background:#f7f7f7; padding:8px; border-radius:6px; font-size:12px }
+  </style>
 </head>
 <body>
-    <!-- Панель управления -->
-    <div class="control-panel">
-        <div class="panel-header">
-            <h2><i class="fas fa-network-wired"></i> Телеком Карта</h2>
-        </div>
-        
-        <!-- Поиск -->
-        <div class="search-section">
-            <div class="search-box">
-                <input type="text" id="addressInput" placeholder="Введите адрес для проверки...">
-                <button class="btn" onclick="checkConnection()">
-                    <i class="fas fa-search"></i> Проверить
-                </button>
-            </div>
-            
-            <!-- Фильтры -->
-            <div class="filters">
-                <select id="objectTypeFilter" onchange="loadMapData()">
-                    <option value="">Все типы объектов</option>
-                    <option value="olt">OLT Станции</option>
-                    <option value="splice_box">Муфты</option>
-                    <option value="splitter">Сплиттеры</option>
-                    <option value="switch">Коммутаторы</option>
-                </select>
-                
-                <select id="technologyFilter" onchange="loadMapData()">
-                    <option value="">Все технологии</option>
-                    <option value="gpon">GPON</option>
-                    <option value="adsl">ADSL</option>
-                    <option value="ethernet">Ethernet</option>
-                </select>
-            </div>
-            
-            <div class="search-box">
-                <button class="btn btn-success" onclick="loadMapData()">
-                    <i class="fas fa-sync-alt"></i> Обновить
-                </button>
-                <button class="btn btn-danger" onclick="clearMap()">
-                    <i class="fas fa-trash"></i> Очистить
-                </button>
-            </div>
-        </div>
-        
-        <!-- Результаты -->
-        <div class="result-box" id="result">
-            <i class="fas fa-info-circle"></i> Введите адрес для проверки подключения
-        </div>
-        
-        <!-- Статистика -->
-        <div class="stats">
-            <h4><i class="fas fa-chart-bar"></i> Статистика</h4>
-            <div class="stats-grid" id="stats">
-                <div class="stat-item">
-                    <div class="stat-value">0</div>
-                    <div>Объектов</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value">0</div>
-                    <div>Свободных портов</div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Загрузка -->
-        <div class="loading" id="loading">
-            <div class="spinner"></div>
-            <div>Загрузка...</div>
-        </div>
+
+  <div class="control-panel">
+    <div class="panel-header">
+      <h2><i class="fas fa-network-wired"></i> Телеком — Худжанд</h2>
+      <div class="muted">ArcGIS Satellite + Leaflet</div>
     </div>
 
-    <!-- Легенда -->
-    <div class="legend">
-        <h4><i class="fas fa-list"></i> Легенда</h4>
-        <div class="legend-item">
-            <div class="legend-color" style="background-color: #e74c3c;"></div>
-            <span>OLT Станции</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-color" style="background-color: #3498db;"></div>
-            <span>Оптические муфты</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-color" style="background-color: #27ae60;"></div>
-            <span>Сплиттер-боксы</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-color" style="background-color: #f39c12;"></div>
-            <span>Коммутаторы</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-color" style="background-color: #9b59b6;"></div>
-            <span>АТС</span>
-        </div>
+    <div>
+      <input id="addressInput" type="text" placeholder="Введите адрес (или координаты) для проверки" />
+      <div style="display:flex; gap:8px; margin-top:6px">
+        <button class="btn" onclick="checkConnection()"><i class="fas fa-search"></i> Проверить</button>
+        <button class="btn small" onclick="locateMe()"><i class="fas fa-crosshairs"></i> Моё местоположение</button>
+        <button class="btn small" onclick="loadMapData()"><i class="fas fa-sync-alt"></i> Обновить</button>
+      </div>
     </div>
 
-    <!-- Карта -->
-    <div id="map"></div>
+    <div style="margin-top:10px">
+      <label class="muted">Фильтры</label>
+      <div style="display:flex; gap:8px; margin-top:6px">
+        <select id="objectTypeFilter" onchange="loadMapData()">
+          <option value="">Все типы</option>
+          <option value="olt">OLT</option>
+          <option value="splice_box">Муфта</option>
+          <option value="splitter">Сплиттер</option>
+          <option value="switch">Коммутатор</option>
+          <option value="ats">АТС</option>
+        </select>
+        <select id="technologyFilter" onchange="loadMapData()">
+          <option value="">Все технологии</option>
+          <option value="gpon">GPON</option>
+          <option value="adsl">ADSL</option>
+          <option value="ethernet">Ethernet</option>
+        </select>
+      </div>
+    </div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/js/all.min.js"></script>
-    <script>
-        // Инициализация карты
-        var map = L.map('map').setView([38.56, 68.78], 13);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap'
-        }).addTo(map);
+    <div class="stat-grid" id="stats" style="margin-top:12px">
+      <div><div class="stat-value" id="statObjects">0</div>Объектов</div>
+      <div><div class="stat-value" id="statFreePorts">0</div>Свободных портов</div>
+    </div>
 
-        // Слои для объектов
-        var objectLayers = {};
-        var cableRoutesLayer = L.layerGroup().addTo(map);
-        
-        // Цвета для типов объектов
-        var typeColors = {
-            'olt': '#e74c3c',
-            'splice_box': '#3498db',
-            'splitter': '#27ae60',
-            'switch': '#f39c12',
-            'ats': '#9b59b6',
-            'building': '#95a5a6',
-            'client': '#34495e'
-        };
+    <div style="margin-top:10px">
+      <div class="floating-actions">
+        <button class="btn small" id="toggleLabelsBtn" onclick="toggleLabels()"><i class="fas fa-tags"></i> Перекл. подписей</button>
+        <button class="btn small" onclick="exportDrawn()"><i class="fas fa-file-export"></i> Экспорт GeoJSON</button>
+        <button class="btn small" onclick="clearDrawn()"><i class="fas fa-trash"></i> Очистить нарисованное</button>
+      </div>
+      <div style="margin-top:8px" id="result" class="muted">Готово — загрузите данные карты.</div>
+    </div>
 
-        // Загрузка данных карты
-        function loadMapData() {
-            showLoading(true);
-            
-            const objectType = document.getElementById('objectTypeFilter').value;
-            const technology = document.getElementById('technologyFilter').value;
-            
-            let url = '/api/map-data/';
-            const params = new URLSearchParams();
-            if (objectType) params.append('object_type', objectType);
-            if (technology) params.append('technology', technology);
-            
-            if (params.toString()) {
-                url += '?' + params.toString();
-            }
-            
-            fetch(url)
-                .then(response => response.json())
-                .then(data => {
-                    clearMap();
-                    addObjectsToMap(data.infrastructure_objects);
-                    addRoutesToMap(data.cable_routes);
-                    updateStats();
-                    showLoading(false);
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    showResult('Ошибка загрузки данных', 'error');
-                    showLoading(false);
-                });
-        }
+  </div>
 
-        // Добавление объектов на карту
-        function addObjectsToMap(objects) {
-            objects.forEach(function(obj) {
-                const color = typeColors[obj.object_type] || '#95a5a6';
-                
-                // Создаем маркер с иконкой
-                const marker = L.circleMarker([obj.lat, obj.lng], {
-                    color: color,
-                    fillColor: color,
-                    fillOpacity: 0.8,
-                    radius: 8,
-                    weight: 2
-                }).addTo(map);
-                
-                // Содержимое popup
-                const popupContent = `
-                    <div class="object-popup">
-                        <div class="popup-header">
-                            <i class="fas fa-network-wired"></i> ${obj.name}
-                        </div>
-                        <div class="popup-details">
-                            <strong>ID:</strong> ${obj.object_id}<br>
-                            <strong>Тип:</strong> ${obj.object_type_display}<br>
-                            <strong>Технология:</strong> ${obj.technology_display || 'Не указана'}<br>
-                            <strong>Порты:</strong> ${obj.free_ports}/${obj.capacity}<br>
-                            <strong>Адрес:</strong> ${obj.address || 'Не указан'}<br>
-                            <div class="popup-status status-${obj.status}">
-                                ${obj.status_display}
-                            </div>
-                        </div>
-                    </div>
-                `;
-                
-                marker.bindPopup(popupContent);
-                
-                // Добавляем в соответствующий слой
-                if (!objectLayers[obj.object_type]) {
-                    objectLayers[obj.object_type] = L.layerGroup().addTo(map);
-                }
-                objectLayers[obj.object_type].addLayer(marker);
-            });
-        }
+  <div class="legend" id="legend">
+    <div style="font-weight:700; margin-bottom:6px">Легенда</div>
+    <div class="legend-item"><span style="color:#e74c3c">●</span> OLT</div>
+    <div class="legend-item"><span style="color:#3498db">●</span> Муфта</div>
+    <div class="legend-item"><span style="color:#27ae60">●</span> Сплиттер</div>
+    <div class="legend-item"><span style="color:#f39c12">●</span> Коммутатор</div>
+  </div>
 
-        // Добавление кабельных трасс
-        function addRoutesToMap(routes) {
-            routes.forEach(function(route) {
-                if (route.from_object && route.to_object) {
-                    const fromLatLng = [route.from_object.lat, route.from_object.lng];
-                    const toLatLng = [route.to_object.lat, route.to_object.lng];
-                    
-                    const polyline = L.polyline([fromLatLng, toLatLng], {
-                        color: '#3498db',
-                        weight: 3,
-                        opacity: 0.7,
-                        dashArray: route.cable_type === 'fiber' ? null : '5, 5'
-                    }).addTo(cableRoutesLayer);
-                    
-                    const popupContent = `
-                        <div class="object-popup">
-                            <div class="popup-header">
-                                <i class="fas fa-cable"></i> ${route.name}
-                            </div>
-                            <div class="popup-details">
-                                <strong>От:</strong> ${route.from_object_name}<br>
-                                <strong>До:</strong> ${route.to_object_name}<br>
-                                <strong>Длина:</strong> ${route.length} м<br>
-                                <strong>Тип кабеля:</strong> ${route.cable_type_display}<br>
-                                <strong>Волокон:</strong> ${route.fiber_count}
-                            </div>
-                        </div>
-                    `;
-                    
-                    polyline.bindPopup(popupContent);
-                }
-            });
-        }
+  <div id="map"></div>
 
-        // Проверка подключения
-        function checkConnection() {
-            const address = document.getElementById('addressInput').value;
-            const resultDiv = document.getElementById('result');
-            
-            if (!address) {
-                showResult('Введите адрес для проверки', 'error');
-                return;
-            }
-            
-            showLoading(true);
-            resultDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Проверяем подключение...';
-            
-            fetch(`/api/check-connection/?address=${encodeURIComponent(address)}`)
-                .then(response => response.json())
-                .then(data => {
-                    let resultClass = data.available ? 'success' : 'error';
-                    let icon = data.available ? 'fa-check-circle' : 'fa-times-circle';
-                    
-                    resultDiv.innerHTML = `
-                        <i class="fas ${icon}"></i> ${data.message}
-                        ${data.nearest_objects && data.nearest_objects.length > 0 ? 
-                            `<br><small>Найдено ${data.nearest_objects.length} точек подключения</small>` : ''
-                        }
-                    `;
-                    resultDiv.className = `result-box ${resultClass}`;
-                    
-                    // Показываем ближайшие объекты на карте
-                    if (data.nearest_objects && data.nearest_objects.length > 0) {
-                        highlightNearestObjects(data.nearest_objects);
-                    }
-                    
-                    showLoading(false);
-                })
-                .catch(error => {
-                    showResult('Ошибка при проверке подключения', 'error');
-                    showLoading(false);
-                });
-        }
+  <!-- SCRIPTS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
 
-        // Подсветка ближайших объектов
-        function highlightNearestObjects(objects) {
-            objects.forEach(function(obj) {
-                const marker = L.circleMarker([obj.lat, obj.lng], {
-                    color: '#f1c40f',
-                    fillColor: '#f1c40f',
-                    fillOpacity: 0.9,
-                    radius: 10,
-                    weight: 3
-                }).addTo(map);
-                
-                marker.bindPopup(`
-                    <div class="object-popup">
-                        <div class="popup-header" style="color: #f39c12;">
-                            <i class="fas fa-bolt"></i> ${obj.name}
-                        </div>
-                        <div class="popup-details">
-                            <strong>Ближайшая точка подключения</strong><br>
-                            <strong>Порты:</strong> ${obj.free_ports}/${obj.capacity}<br>
-                            <strong>Расстояние:</strong> ~${obj.distance || '?'} м
-                        </div>
-                    </div>
-                `).openPopup();
-            });
-        }
+  <script>
+  /****************************************************************
+   * Enhanced map: ArcGIS Satellite + OSM, labels, clusters, draw
+   ****************************************************************/
 
-        // Обновление статистики
-        function updateStats() {
-            fetch('/api/infrastructure/stats/')
-                .then(response => response.json())
-                .then(stats => {
-                    document.getElementById('stats').innerHTML = `
-                        <div class="stat-item">
-                            <div class="stat-value">${stats.total_objects}</div>
-                            <div>Объектов</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-value">${stats.total_free_ports}</div>
-                            <div>Свободных портов</div>
-                        </div>
-                    `;
-                })
-                .catch(error => {
-                    console.error('Error loading stats:', error);
-                });
-        }
+  // --- init map (centered on Худжанд) ---
+  var map = L.map('map', {
+    center: [40.291, 69.622],
+    zoom: 14,
+    minZoom: 4
+  });
 
-        // Очистка карты
-        function clearMap() {
-            Object.values(objectLayers).forEach(layer => {
-                map.removeLayer(layer);
-            });
-            map.removeLayer(cableRoutesLayer);
-            cableRoutesLayer = L.layerGroup().addTo(map);
-            objectLayers = {};
-        }
+  // --- base layers ---
+  var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '© OpenStreetMap'
+  });
 
-        // Показать/скрыть загрузку
-        function showLoading(show) {
-            document.getElementById('loading').style.display = show ? 'block' : 'none';
-        }
+  var arcgisSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 20,
+    attribution: 'Tiles © Esri — Source: Esri, Maxar'
+  }).addTo(map); // satellite as default
 
-        // Показать результат
-        function showResult(message, type = 'info') {
-            const resultDiv = document.getElementById('result');
-            const icons = {
-                'info': 'fa-info-circle',
-                'success': 'fa-check-circle',
-                'error': 'fa-times-circle'
-            };
-            
-            resultDiv.innerHTML = `<i class="fas ${icons[type]}"></i> ${message}`;
-            resultDiv.className = `result-box ${type}`;
-        }
+  // --- labels overlay (ArcGIS reference layer with place names/labels) ---
+  var arcgisLabels = L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 20,
+    attribution: 'Labels © Esri'
+  });
 
-        // Загрузка данных при старте
-        document.addEventListener('DOMContentLoaded', function() {
-            loadMapData();
+  var baseMaps = {
+    "🛰 Спутник (ArcGIS)": arcgisSatellite,
+    "🗺 Стандартная (OSM)": osm
+  };
+
+  var overlayMaps = {
+    "Подписи (ArcGIS Labels)": arcgisLabels
+  };
+
+  L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
+
+  // --- marker clusters per type (so we can toggle types individually) ---
+  var markerClusters = {};   // key: object_type -> L.MarkerClusterGroup
+  var allClustersGroup = L.layerGroup().addTo(map); // convenience group
+
+  var cableRoutesLayer = L.layerGroup().addTo(map); // polylines layer
+
+  // types colors & SVG icons (HD)
+  var typeConfig = {
+    'olt': { color:'#e74c3c', label:'OLT' },
+    'splice_box': { color:'#3498db', label:'Муфта' },
+    'splitter': { color:'#27ae60', label:'Сплиттер' },
+    'switch': { color:'#f39c12', label:'Коммутатор' },
+    'ats': { color:'#9b59b6', label:'АТС' },
+    'building': { color:'#95a5a6', label:'Дом' },
+    'client': { color:'#34495e', label:'Клиент' }
+  };
+
+  function makeSvgIcon(color, letter) {
+    // simple circular SVG marker with letter
+    var svg = encodeURIComponent(`
+      <svg xmlns="http://www.w3.org/2000/svg" width="42" height="42" viewBox="0 0 42 42">
+        <circle cx="21" cy="18" r="12" fill="${color}" stroke="#fff" stroke-width="2"/>
+        <text x="21" y="23" font-size="12" font-family="Arial" font-weight="700" fill="#ffffff" text-anchor="middle">${letter||''}</text>
+        <path d="M21 30 L17 42 L25 42 Z" fill="${color}"/>
+      </svg>
+    `);
+    return L.icon({
+      iconUrl: 'data:image/svg+xml;charset=utf-8,' + svg,
+      iconSize: [28, 42],
+      iconAnchor: [14, 42],
+      popupAnchor: [0, -36],
+      className: ''
+    });
+  }
+
+  // Pre-create cluster groups and add to layer control (will be filled later)
+  Object.keys(typeConfig).forEach(function(t) {
+    markerClusters[t] = L.markerClusterGroup({ chunkedLoading: true, maxClusterRadius: 50 });
+    // add to overlays so user can toggle type visibility
+    overlayMaps[typeConfig[t].label + ' (слой)'] = markerClusters[t];
+  });
+
+  // re-add layer control (we need dynamic overlays initialized)
+  // remove previous control then add with updated overlayMaps
+  document.querySelectorAll('.leaflet-control-layers').forEach(e => e.remove());
+  L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
+
+  // Helper: format popup HTML
+  function makePopupHtml(obj) {
+    return `
+      <div style="min-width:200px">
+        <div style="font-weight:700; margin-bottom:6px;">${obj.name}</div>
+        <div style="font-size:13px">
+          <b>ID:</b> ${obj.object_id}<br/>
+          <b>Тип:</b> ${obj.object_type_display || obj.object_type}<br/>
+          <b>Технология:</b> ${obj.technology_display || obj.technology || '—'}<br/>
+          <b>Порты:</b> ${obj.free_ports}/${obj.capacity}<br/>
+          <b>Адрес:</b> ${obj.address || '—'}
+        </div>
+      </div>
+    `;
+  }
+
+  // Load data and populate map
+  function loadMapData() {
+    showResult('Загрузка данных...');
+    showLoading(true);
+
+    const objectType = document.getElementById('objectTypeFilter').value;
+    const technology = document.getElementById('technologyFilter').value;
+    let url = '/api/map-data/';
+    const params = new URLSearchParams();
+    if (objectType) params.append('object_type', objectType);
+    if (technology) params.append('technology', technology);
+    if (params.toString()) url += '?' + params.toString();
+
+    fetch(url)
+      .then(r => {
+        if (!r.ok) throw new Error('Ошибка загрузки данных: ' + r.status);
+        return r.json();
+      })
+      .then(data => {
+        clearMap();
+        // objects
+        (data.infrastructure_objects || []).forEach(obj => {
+          const t = obj.object_type || 'building';
+          const cfg = typeConfig[t] || { color:'#95a5a6', label:t };
+          const letter = (cfg.label || t).slice(0,1).toUpperCase();
+          const icon = makeSvgIcon(cfg.color, letter);
+
+          const m = L.marker([obj.lat, obj.lng], { icon: icon })
+            .bindPopup(makePopupHtml(obj));
+
+          // store distance if present (for highlight)
+          m._meta = { id: obj.id, objectData: obj };
+
+          if (!markerClusters[t]) {
+            markerClusters[t] = L.markerClusterGroup({ chunkedLoading:true });
+            overlayMaps[cfg.label + ' (слой)'] = markerClusters[t];
+          }
+          markerClusters[t].addLayer(m);
         });
-    </script>
+
+        // add clusters to map (if not already)
+        Object.keys(markerClusters).forEach(k => {
+          if (!map.hasLayer(markerClusters[k])) {
+            markerClusters[k].addTo(map);
+          }
+        });
+
+        // cable routes
+        (data.cable_routes || []).forEach(route => {
+          if (route.from_object && route.to_object) {
+            const latlngs = [
+              [route.from_object.lat, route.from_object.lng],
+              [route.to_object.lat, route.to_object.lng]
+            ];
+            var poly = L.polyline(latlngs, { color:'#2a9df4', weight:3, opacity:0.8 }).bindPopup(
+              `<div style="font-weight:700">${route.name}</div><div>${route.length} м</div>`
+            );
+            cableRoutesLayer.addLayer(poly);
+          }
+        });
+
+        // add cableRoutes layer to overlays so users can toggle
+        if (!overlayMaps["Кабельные трассы"]) {
+          overlayMaps["Кабельные трассы"] = cableRoutesLayer;
+          // re-create control to include new overlay
+          document.querySelectorAll('.leaflet-control-layers').forEach(e => e.remove());
+          L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
+        }
+
+        updateStats();
+        showResult('Данные загружены', 'success');
+      })
+      .catch(err => {
+        console.error(err);
+        showResult('Ошибка загрузки карты: ' + err.message, 'error');
+      })
+      .finally(() => { showLoading(false); });
+  }
+
+  // --- locate me ---
+  function locateMe() {
+    showResult('Определяю местоположение...');
+    map.locate({ setView:true, maxZoom:16, watch:false });
+  }
+  map.on('locationfound', function(e){
+    L.circle(e.latlng, { radius: Math.max(e.accuracy, 20), color:'#2ecc71', weight:1, fillOpacity:0.1 }).addTo(map);
+    showResult('Местоположение найдено', 'success');
+  });
+  map.on('locationerror', function(){
+    showResult('Не удалось определить местоположение', 'error');
+  });
+
+  // toggle labels overlay
+  var labelsVisible = false;
+  function toggleLabels(){
+    labelsVisible = !labelsVisible;
+    if (labelsVisible) {
+      arcgisLabels.addTo(map);
+      document.getElementById('toggleLabelsBtn').innerText = 'Откл. подписи';
+    } else {
+      map.removeLayer(arcgisLabels);
+      document.getElementById('toggleLabelsBtn').innerText = 'Перекл. подписей';
+    }
+  }
+
+  // check connection (uses your API)
+  function checkConnection(){
+    var q = document.getElementById('addressInput').value.trim();
+    if (!q) { showResult('Введите адрес для проверки', 'error'); return; }
+    showResult('Проверка подключения...');
+    showLoading(true);
+    fetch('/api/check-connection/?address=' + encodeURIComponent(q))
+      .then(r => r.json())
+      .then(data=>{
+        if (data.available) {
+          showResult(data.message, 'success');
+        } else {
+          showResult(data.message, 'error');
+        }
+        // highlight nearest if present
+        if (data.nearest_objects && data.nearest_objects.length) highlightNearest(data.nearest_objects);
+      })
+      .catch(err=>{
+        console.error(err);
+        showResult('Ошибка проверки подключения', 'error');
+      })
+      .finally(()=>showLoading(false));
+  }
+
+  // highlight nearest objects (simple)
+  function highlightNearest(list) {
+    // add temporary markers
+    list.forEach(o=>{
+      var m = L.circleMarker([o.lat, o.lng], { radius:10, color:'#f1c40f', fillColor:'#f1c40f', weight:2, fillOpacity:0.9 }).addTo(map);
+      m.bindPopup(`<b>${o.name}</b><br>Порты: ${o.free_ports}/${o.capacity}`).openPopup();
+      setTimeout(()=>map.removeLayer(m), 8000);
+    });
+  }
+
+  // --- stats ---
+  function updateStats(){
+    fetch('/api/infrastructure/stats/')
+      .then(r=>r.json())
+      .then(s=>{
+        document.getElementById('statObjects').innerText = s.total_objects || 0;
+        document.getElementById('statFreePorts').innerText = s.total_free_ports || 0;
+      })
+      .catch(e=>console.warn('stats err', e));
+  }
+
+  // --- clear map layers ---
+  function clearMap(){
+    // remove clusters
+    Object.keys(markerClusters).forEach(k=>{
+      try { markerClusters[k].clearLayers(); } catch(e) {}
+    });
+    // remove cable routes
+    cableRoutesLayer.clearLayers();
+  }
+
+  function showLoading(flag){
+    var el = document.getElementById('result');
+    el.style.opacity = flag ? 0.6 : 1;
+  }
+
+  function showResult(msg, type){
+    var el = document.getElementById('result');
+    el.innerText = msg;
+    if (type==='success') el.style.color = '#16a34a';
+    else if (type==='error') el.style.color = '#dc2626';
+    else el.style.color = '#374151';
+  }
+
+  /*******************
+   * Drawing / editing (Leaflet.draw)
+   *******************/
+  var drawnItems = new L.FeatureGroup().addTo(map);
+
+  var drawControl = new L.Control.Draw({
+    position: 'topright',
+    draw: {
+      polygon: false,
+      rectangle: false,
+      circle: false,
+      marker: false,
+      circlemarker: false,
+      polyline: {
+        shapeOptions: { color: '#ff7b00', weight: 4 }
+      }
+    },
+    edit: {
+      featureGroup: drawnItems,
+      remove: true
+    }
+  });
+  map.addControl(drawControl);
+
+  // When user finishes drawing, open prompt to name and optionally POST to server
+  map.on(L.Draw.Event.CREATED, function (e) {
+    var layer = e.layer;
+    drawnItems.addLayer(layer);
+    // Ask user for metadata (simple prompt)
+    var name = prompt("Название трассы (оставь пустым, если не нужно):", "");
+    if (name) {
+      layer.bindPopup("<b>" + escapeHtml(name) + "</b>").openPopup();
+    }
+    // Save geometry as GeoJSON attached to layer
+    layer.feature = layer.feature || {};
+    layer.feature.type = "Feature";
+    layer.feature.properties = layer.feature.properties || {};
+    layer.feature.properties.name = name || '';
+  });
+
+  map.on('draw:edited', function(e){
+    showResult('Отредактировано ' + e.layers.getLayers().length + ' объектов', 'success');
+  });
+
+  // Export drawn items to GeoJSON (download & console)
+  function exportDrawn(){
+    var geojson = drawnItems.toGeoJSON();
+    var text = JSON.stringify(geojson, null, 2);
+    // Open in new window for copy
+    var w = window.open("", "_blank");
+    w.document.write("<pre>" + escapeHtml(text) + "</pre>");
+    // Example: POST to backend (uncomment & adjust endpoint if you have API)
+    /*
+    fetch('/api/cable-routes/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: text
+    }).then(r=>r.json()).then(console.log).catch(console.error);
+    */
+  }
+
+  function clearDrawn(){
+    drawnItems.clearLayers();
+    showResult('Нарисованные объекты удалены');
+  }
+
+  function escapeHtml(unsafe) {
+    return unsafe ? unsafe.replace(/[&<"'>]/g, function(m){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]; }) : '';
+  }
+
+  // --- initial load ---
+  loadMapData();
+
+  // ensure map resizes correctly if control panel changes
+  setTimeout(()=>map.invalidateSize(), 300);
+
+  </script>
 </body>
 </html>
