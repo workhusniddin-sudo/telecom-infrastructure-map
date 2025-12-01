@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Выбор точки — Телеком карта</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    html,body { height:100%; margin:0; }
+    #map { width:100%; height:100vh; }
+    .info { position:absolute; top:10px; left:10px; z-index:1000; background:#fff; padding:8px 10px; border-radius:6px; box-shadow:0 4px 12px rgba(0,0,0,0.12); font-size:13px }
+  </style>
+</head>
+<body>
+  <div class="info">Кликните на карту, чтобы выбрать точку. Если вы открыли эту страницу отдельно — клик откроет форму добавления в админке.</div>
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    var map = L.map('map').setView([40.291, 69.622], 14);
+    var arcgisSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}').addTo(map);
+    var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
+    L.control.layers({ "Спутник (ArcGIS)": arcgisSatellite, "OSM": osm }).addTo(map);
+
+    var marker = null;
+
+    function onMapClick(e){
+      var lat = e.latlng.lat.toFixed(6);
+      var lng = e.latlng.lng.toFixed(6);
+      if (marker) map.removeLayer(marker);
+      marker = L.marker([lat, lng]).addTo(map);
+      marker.bindPopup("Широта: " + lat + "<br>Долгота: " + lng).openPopup();
+
+      // Если открыт в iframe (в админке) — отправим сообщение родителю
+      try {
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({ type: 'coords_selected', lat: lat, lng: lng }, '*');
+          // НЕ перенаправляем здесь — parent (admin) закроет modal
+          return;
+        }
+      } catch (err) { /* ignore */ }
+
+      // Если открыт отдельно — перенаправим на страницу добавления в админке
+      var adminAddUrl = '/admin/telecom_net/infrastructureobject/add/?lat=' + encodeURIComponent(lat) + '&lng=' + encodeURIComponent(lng);
+      window.location.href = adminAddUrl;
+    }
+
+    map.on('click', onMapClick);
+  </script>
+</body>
+</html>

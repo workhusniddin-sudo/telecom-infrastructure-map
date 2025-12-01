@@ -23,4 +23,6 @@ urlpatterns = [
     path('infrastructure/stats/', 
          views.InfrastructureObjectViewSet.as_view({'get': 'stats'}), 
          name='infrastructure-stats'),
+     path("map-picker/", views.map_picker, name="map-picker"),
+     
 ]

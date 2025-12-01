@@ -18,7 +18,6 @@
   <style>
     html,body { height:100%; margin:0; font-family: "Segoe UI", Tahoma, Verdana, sans-serif; background:#f5f5f5; }
     #map { width:100%; height:100vh; }
-    /* Control panel */
     .control-panel{
       position:absolute; left:12px; top:12px; z-index:1100;
       width:380px; background:#fff; padding:16px; border-radius:12px;
@@ -36,10 +35,10 @@
     .stat-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; background:#2f3b46; color:#fff; padding:8px; border-radius:8px; font-size:13px }
     .stat-value { font-weight:700; font-size:1.05rem; color:#7bd389 }
     .floating-actions { margin-top:10px; display:flex; gap:8px; flex-wrap:wrap }
-    /* small helpers */
     .muted { color:#6b7280; font-size:0.95rem }
-    .draw-export { margin-top:10px; display:flex; gap:8px }
     pre#geojsonOut { max-height:150px; overflow:auto; background:#f7f7f7; padding:8px; border-radius:6px; font-size:12px }
+    /* small indicator for Add-Mode */
+    .add-mode-indicator { display:inline-block; margin-left:8px; font-weight:700; color:#d97706 }
   </style>
 </head>
 <body>
@@ -89,6 +88,8 @@
         <button class="btn small" id="toggleLabelsBtn" onclick="toggleLabels()"><i class="fas fa-tags"></i> Перекл. подписей</button>
         <button class="btn small" onclick="exportDrawn()"><i class="fas fa-file-export"></i> Экспорт GeoJSON</button>
         <button class="btn small" onclick="clearDrawn()"><i class="fas fa-trash"></i> Очистить нарисованное</button>
+        <button class="btn small" id="startAddBtn" onclick="toggleAddMode()"><i class="fas fa-plus-circle"></i> Добавить объект</button>
+        <span id="addModeIndicator" class="add-mode-indicator" style="display:none">Режим: выбрать точку</span>
       </div>
       <div style="margin-top:8px" id="result" class="muted">Готово — загрузите данные карты.</div>
     </div>
@@ -111,52 +112,22 @@
   <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
 
   <script>
-  /****************************************************************
-   * Enhanced map: ArcGIS Satellite + OSM, labels, clusters, draw
-   ****************************************************************/
-
   // --- init map (centered on Худжанд) ---
-  var map = L.map('map', {
-    center: [40.291, 69.622],
-    zoom: 14,
-    minZoom: 4
-  });
+  var map = L.map('map', { center: [40.291, 69.622], zoom: 14, minZoom: 4 });
 
   // --- base layers ---
-  var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '© OpenStreetMap'
-  });
+  var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' });
+  var arcgisSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 20, attribution: 'Tiles © Esri — Source: Esri, Maxar' }).addTo(map);
+  var arcgisLabels = L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { maxZoom: 20, attribution: 'Labels © Esri' });
 
-  var arcgisSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-    maxZoom: 20,
-    attribution: 'Tiles © Esri — Source: Esri, Maxar'
-  }).addTo(map); // satellite as default
-
-  // --- labels overlay (ArcGIS reference layer with place names/labels) ---
-  var arcgisLabels = L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
-    maxZoom: 20,
-    attribution: 'Labels © Esri'
-  });
-
-  var baseMaps = {
-    "🛰 Спутник (ArcGIS)": arcgisSatellite,
-    "🗺 Стандартная (OSM)": osm
-  };
-
-  var overlayMaps = {
-    "Подписи (ArcGIS Labels)": arcgisLabels
-  };
-
+  var baseMaps = { "🛰 Спутник (ArcGIS)": arcgisSatellite, "🗺 Стандартная (OSM)": osm };
+  var overlayMaps = { "Подписи (ArcGIS Labels)": arcgisLabels };
   L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
 
-  // --- marker clusters per type (so we can toggle types individually) ---
-  var markerClusters = {};   // key: object_type -> L.MarkerClusterGroup
-  var allClustersGroup = L.layerGroup().addTo(map); // convenience group
+  // marker clusters and layers
+  var markerClusters = {};
+  var cableRoutesLayer = L.layerGroup().addTo(map);
 
-  var cableRoutesLayer = L.layerGroup().addTo(map); // polylines layer
-
-  // types colors & SVG icons (HD)
   var typeConfig = {
     'olt': { color:'#e74c3c', label:'OLT' },
     'splice_box': { color:'#3498db', label:'Муфта' },
@@ -168,7 +139,6 @@
   };
 
   function makeSvgIcon(color, letter) {
-    // simple circular SVG marker with letter
     var svg = encodeURIComponent(`
       <svg xmlns="http://www.w3.org/2000/svg" width="42" height="42" viewBox="0 0 42 42">
         <circle cx="21" cy="18" r="12" fill="${color}" stroke="#fff" stroke-width="2"/>
@@ -176,28 +146,19 @@
         <path d="M21 30 L17 42 L25 42 Z" fill="${color}"/>
       </svg>
     `);
-    return L.icon({
-      iconUrl: 'data:image/svg+xml;charset=utf-8,' + svg,
-      iconSize: [28, 42],
-      iconAnchor: [14, 42],
-      popupAnchor: [0, -36],
-      className: ''
-    });
+    return L.icon({ iconUrl: 'data:image/svg+xml;charset=utf-8,' + svg, iconSize: [28,42], iconAnchor: [14,42], popupAnchor: [0,-36] });
   }
 
-  // Pre-create cluster groups and add to layer control (will be filled later)
+  // pre-create clusters and add overlays
   Object.keys(typeConfig).forEach(function(t) {
     markerClusters[t] = L.markerClusterGroup({ chunkedLoading: true, maxClusterRadius: 50 });
-    // add to overlays so user can toggle type visibility
     overlayMaps[typeConfig[t].label + ' (слой)'] = markerClusters[t];
   });
+  // re-create control to include overlay maps
+  document.querySelectorAll('.leaflet-control-layers').forEach(e=>e.remove());
+  L.control.layers(baseMaps, overlayMaps, { collapsed:false }).addTo(map);
 
-  // re-add layer control (we need dynamic overlays initialized)
-  // remove previous control then add with updated overlayMaps
-  document.querySelectorAll('.leaflet-control-layers').forEach(e => e.remove());
-  L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
-
-  // Helper: format popup HTML
+  // popup html builder
   function makePopupHtml(obj) {
     return `
       <div style="min-width:200px">
@@ -213,11 +174,10 @@
     `;
   }
 
-  // Load data and populate map
-  function loadMapData() {
+  // load data from API
+  function loadMapData(){
     showResult('Загрузка данных...');
     showLoading(true);
-
     const objectType = document.getElementById('objectTypeFilter').value;
     const technology = document.getElementById('technologyFilter').value;
     let url = '/api/map-data/';
@@ -226,240 +186,101 @@
     if (technology) params.append('technology', technology);
     if (params.toString()) url += '?' + params.toString();
 
-    fetch(url)
-      .then(r => {
-        if (!r.ok) throw new Error('Ошибка загрузки данных: ' + r.status);
-        return r.json();
-      })
-      .then(data => {
-        clearMap();
-        // objects
-        (data.infrastructure_objects || []).forEach(obj => {
-          const t = obj.object_type || 'building';
-          const cfg = typeConfig[t] || { color:'#95a5a6', label:t };
-          const letter = (cfg.label || t).slice(0,1).toUpperCase();
-          const icon = makeSvgIcon(cfg.color, letter);
-
-          const m = L.marker([obj.lat, obj.lng], { icon: icon })
-            .bindPopup(makePopupHtml(obj));
-
-          // store distance if present (for highlight)
-          m._meta = { id: obj.id, objectData: obj };
-
-          if (!markerClusters[t]) {
-            markerClusters[t] = L.markerClusterGroup({ chunkedLoading:true });
-            overlayMaps[cfg.label + ' (слой)'] = markerClusters[t];
-          }
-          markerClusters[t].addLayer(m);
-        });
-
-        // add clusters to map (if not already)
-        Object.keys(markerClusters).forEach(k => {
-          if (!map.hasLayer(markerClusters[k])) {
-            markerClusters[k].addTo(map);
-          }
-        });
-
-        // cable routes
-        (data.cable_routes || []).forEach(route => {
-          if (route.from_object && route.to_object) {
-            const latlngs = [
-              [route.from_object.lat, route.from_object.lng],
-              [route.to_object.lat, route.to_object.lng]
-            ];
-            var poly = L.polyline(latlngs, { color:'#2a9df4', weight:3, opacity:0.8 }).bindPopup(
-              `<div style="font-weight:700">${route.name}</div><div>${route.length} м</div>`
-            );
-            cableRoutesLayer.addLayer(poly);
-          }
-        });
-
-        // add cableRoutes layer to overlays so users can toggle
-        if (!overlayMaps["Кабельные трассы"]) {
-          overlayMaps["Кабельные трассы"] = cableRoutesLayer;
-          // re-create control to include new overlay
-          document.querySelectorAll('.leaflet-control-layers').forEach(e => e.remove());
-          L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
+    fetch(url).then(r => {
+      if (!r.ok) throw new Error('Ошибка загрузки данных: ' + r.status);
+      return r.json();
+    }).then(data => {
+      clearMap();
+      (data.infrastructure_objects || []).forEach(obj => {
+        const t = obj.object_type || 'building';
+        const cfg = typeConfig[t] || { color:'#95a5a6', label:t };
+        const letter = (cfg.label || t).slice(0,1).toUpperCase();
+        const icon = makeSvgIcon(cfg.color, letter);
+        const m = L.marker([obj.lat, obj.lng], { icon: icon }).bindPopup(makePopupHtml(obj));
+        m._meta = { id: obj.id, objectData: obj };
+        markerClusters[t].addLayer(m);
+      });
+      Object.keys(markerClusters).forEach(k => {
+        if (!map.hasLayer(markerClusters[k])) markerClusters[k].addTo(map);
+      });
+      (data.cable_routes || []).forEach(route => {
+        if (route.from_object && route.to_object) {
+          const latlngs = [[route.from_object.lat, route.from_object.lng],[route.to_object.lat, route.to_object.lng]];
+          var poly = L.polyline(latlngs, { color:'#2a9df4', weight:3, opacity:0.8 }).bindPopup(`<div style="font-weight:700">${route.name}</div><div>${route.length} м</div>`);
+          cableRoutesLayer.addLayer(poly);
         }
-
-        updateStats();
-        showResult('Данные загружены', 'success');
-      })
-      .catch(err => {
-        console.error(err);
-        showResult('Ошибка загрузки карты: ' + err.message, 'error');
-      })
-      .finally(() => { showLoading(false); });
-  }
-
-  // --- locate me ---
-  function locateMe() {
-    showResult('Определяю местоположение...');
-    map.locate({ setView:true, maxZoom:16, watch:false });
-  }
-  map.on('locationfound', function(e){
-    L.circle(e.latlng, { radius: Math.max(e.accuracy, 20), color:'#2ecc71', weight:1, fillOpacity:0.1 }).addTo(map);
-    showResult('Местоположение найдено', 'success');
-  });
-  map.on('locationerror', function(){
-    showResult('Не удалось определить местоположение', 'error');
-  });
-
-  // toggle labels overlay
-  var labelsVisible = false;
-  function toggleLabels(){
-    labelsVisible = !labelsVisible;
-    if (labelsVisible) {
-      arcgisLabels.addTo(map);
-      document.getElementById('toggleLabelsBtn').innerText = 'Откл. подписи';
-    } else {
-      map.removeLayer(arcgisLabels);
-      document.getElementById('toggleLabelsBtn').innerText = 'Перекл. подписей';
-    }
-  }
-
-  // check connection (uses your API)
-  function checkConnection(){
-    var q = document.getElementById('addressInput').value.trim();
-    if (!q) { showResult('Введите адрес для проверки', 'error'); return; }
-    showResult('Проверка подключения...');
-    showLoading(true);
-    fetch('/api/check-connection/?address=' + encodeURIComponent(q))
-      .then(r => r.json())
-      .then(data=>{
-        if (data.available) {
-          showResult(data.message, 'success');
-        } else {
-          showResult(data.message, 'error');
-        }
-        // highlight nearest if present
-        if (data.nearest_objects && data.nearest_objects.length) highlightNearest(data.nearest_objects);
-      })
-      .catch(err=>{
-        console.error(err);
-        showResult('Ошибка проверки подключения', 'error');
-      })
+      });
+      updateStats();
+      showResult('Данные загружены', 'success');
+    }).catch(err => { console.error(err); showResult('Ошибка загрузки карты: ' + err.message, 'error'); })
       .finally(()=>showLoading(false));
   }
 
-  // highlight nearest objects (simple)
-  function highlightNearest(list) {
-    // add temporary markers
-    list.forEach(o=>{
-      var m = L.circleMarker([o.lat, o.lng], { radius:10, color:'#f1c40f', fillColor:'#f1c40f', weight:2, fillOpacity:0.9 }).addTo(map);
-      m.bindPopup(`<b>${o.name}</b><br>Порты: ${o.free_ports}/${o.capacity}`).openPopup();
-      setTimeout(()=>map.removeLayer(m), 8000);
-    });
+  // locate me
+  function locateMe(){ showResult('Определяю местоположение...'); map.locate({ setView:true, maxZoom:16, watch:false }); }
+  map.on('locationfound', function(e){ L.circle(e.latlng, { radius: Math.max(e.accuracy,20), color:'#2ecc71', weight:1, fillOpacity:0.1 }).addTo(map); showResult('Местоположение найдено','success'); });
+  map.on('locationerror', function(){ showResult('Не удалось определить местоположение','error'); });
+
+  var labelsVisible = false;
+  function toggleLabels(){ labelsVisible = !labelsVisible; if (labelsVisible) { arcgisLabels.addTo(map); document.getElementById('toggleLabelsBtn').innerText='Откл. подписи'; } else { map.removeLayer(arcgisLabels); document.getElementById('toggleLabelsBtn').innerText='Перекл. подписей'; } }
+
+  function checkConnection(){
+    var q = document.getElementById('addressInput').value.trim();
+    if (!q) { showResult('Введите адрес для проверки','error'); return; }
+    showResult('Проверка подключения...'); showLoading(true);
+    fetch('/api/check-connection/?address=' + encodeURIComponent(q))
+      .then(r => r.json()).then(data => {
+        showResult(data.message, data.available ? 'success' : 'error');
+        if (data.nearest_objects && data.nearest_objects.length) highlightNearest(data.nearest_objects);
+      }).catch(err=>{ console.error(err); showResult('Ошибка проверки подключения','error'); })
+      .finally(()=>showLoading(false));
   }
 
-  // --- stats ---
-  function updateStats(){
-    fetch('/api/infrastructure/stats/')
-      .then(r=>r.json())
-      .then(s=>{
-        document.getElementById('statObjects').innerText = s.total_objects || 0;
-        document.getElementById('statFreePorts').innerText = s.total_free_ports || 0;
-      })
-      .catch(e=>console.warn('stats err', e));
-  }
+  function highlightNearest(list){ list.forEach(o=>{ var m=L.circleMarker([o.lat,o.lng],{ radius:10, color:'#f1c40f', fillColor:'#f1c40f', weight:2, fillOpacity:0.9 }).addTo(map); m.bindPopup(`<b>${o.name}</b><br>Порты: ${o.free_ports}/${o.capacity}`).openPopup(); setTimeout(()=>map.removeLayer(m),8000); }); }
 
-  // --- clear map layers ---
-  function clearMap(){
-    // remove clusters
-    Object.keys(markerClusters).forEach(k=>{
-      try { markerClusters[k].clearLayers(); } catch(e) {}
-    });
-    // remove cable routes
-    cableRoutesLayer.clearLayers();
-  }
+  function updateStats(){ fetch('/api/infrastructure/stats/').then(r=>r.json()).then(s=>{ document.getElementById('statObjects').innerText = s.total_objects || 0; document.getElementById('statFreePorts').innerText = s.total_free_ports || 0; }).catch(e=>console.warn('stats err', e)); }
 
-  function showLoading(flag){
-    var el = document.getElementById('result');
-    el.style.opacity = flag ? 0.6 : 1;
-  }
+  function clearMap(){ Object.keys(markerClusters).forEach(k=>{ try{ markerClusters[k].clearLayers(); }catch(e){} }); cableRoutesLayer.clearLayers(); }
 
-  function showResult(msg, type){
-    var el = document.getElementById('result');
-    el.innerText = msg;
-    if (type==='success') el.style.color = '#16a34a';
-    else if (type==='error') el.style.color = '#dc2626';
-    else el.style.color = '#374151';
-  }
+  function showLoading(flag){ var el = document.getElementById('result'); el.style.opacity = flag ? 0.6 : 1; }
+  function showResult(msg, type){ var el=document.getElementById('result'); el.innerText = msg; if(type==='success') el.style.color='#16a34a'; else if(type==='error') el.style.color='#dc2626'; else el.style.color='#374151'; }
 
-  /*******************
-   * Drawing / editing (Leaflet.draw)
-   *******************/
+  // Drawing
   var drawnItems = new L.FeatureGroup().addTo(map);
-
-  var drawControl = new L.Control.Draw({
-    position: 'topright',
-    draw: {
-      polygon: false,
-      rectangle: false,
-      circle: false,
-      marker: false,
-      circlemarker: false,
-      polyline: {
-        shapeOptions: { color: '#ff7b00', weight: 4 }
-      }
-    },
-    edit: {
-      featureGroup: drawnItems,
-      remove: true
-    }
-  });
+  var drawControl = new L.Control.Draw({ position:'topright', draw:{ polygon:false, rectangle:false, circle:false, marker:false, circlemarker:false, polyline:{ shapeOptions:{ color:'#ff7b00', weight:4 } } }, edit:{ featureGroup:drawnItems, remove:true } });
   map.addControl(drawControl);
+  map.on(L.Draw.Event.CREATED, function(e){ var layer = e.layer; drawnItems.addLayer(layer); var name = prompt("Название трассы (опционально):",""); if(name){ layer.bindPopup("<b>"+escapeHtml(name)+"</b>").openPopup(); } layer.feature = layer.feature||{}; layer.feature.type="Feature"; layer.feature.properties = layer.feature.properties||{}; layer.feature.properties.name = name || ''; });
 
-  // When user finishes drawing, open prompt to name and optionally POST to server
-  map.on(L.Draw.Event.CREATED, function (e) {
-    var layer = e.layer;
-    drawnItems.addLayer(layer);
-    // Ask user for metadata (simple prompt)
-    var name = prompt("Название трассы (оставь пустым, если не нужно):", "");
-    if (name) {
-      layer.bindPopup("<b>" + escapeHtml(name) + "</b>").openPopup();
-    }
-    // Save geometry as GeoJSON attached to layer
-    layer.feature = layer.feature || {};
-    layer.feature.type = "Feature";
-    layer.feature.properties = layer.feature.properties || {};
-    layer.feature.properties.name = name || '';
+  map.on('draw:edited', function(e){ showResult('Отредактировано ' + e.layers.getLayers().length + ' объектов', 'success'); });
+
+  function exportDrawn(){ var geojson = drawnItems.toGeoJSON(); var text = JSON.stringify(geojson, null, 2); var w=window.open("","_blank"); w.document.write("<pre>"+escapeHtml(text)+"</pre>"); }
+
+  function clearDrawn(){ drawnItems.clearLayers(); showResult('Нарисованные объекты удалены'); }
+
+  function escapeHtml(unsafe){ return unsafe ? unsafe.replace(/[&<"'>]/g, function(m){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]; }) : ''; }
+
+  // ---- Add-Mode: нажатие по карте откроет страницу админки add с GET параметрами lat,lng
+  var addMode = false;
+  function toggleAddMode(){
+    addMode = !addMode;
+    document.getElementById('addModeIndicator').style.display = addMode ? 'inline-block' : 'none';
+    document.getElementById('startAddBtn').innerText = addMode ? 'Отмена' : 'Добавить объект';
+  }
+
+  map.on('click', function(e){
+    if (!addMode) return;
+    var lat = e.latlng.lat.toFixed(6);
+    var lng = e.latlng.lng.toFixed(6);
+    // Открываем страницу админки в новом окне с GET параметрами
+    var adminUrl = '/admin/telecom_net/infrastructureobject/add/?lat=' + encodeURIComponent(lat) + '&lng=' + encodeURIComponent(lng);
+    // Открыть в новой вкладке:
+    window.open(adminUrl, '_blank');
+    // выключаем режим
+    toggleAddMode();
   });
-
-  map.on('draw:edited', function(e){
-    showResult('Отредактировано ' + e.layers.getLayers().length + ' объектов', 'success');
-  });
-
-  // Export drawn items to GeoJSON (download & console)
-  function exportDrawn(){
-    var geojson = drawnItems.toGeoJSON();
-    var text = JSON.stringify(geojson, null, 2);
-    // Open in new window for copy
-    var w = window.open("", "_blank");
-    w.document.write("<pre>" + escapeHtml(text) + "</pre>");
-    // Example: POST to backend (uncomment & adjust endpoint if you have API)
-    /*
-    fetch('/api/cable-routes/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: text
-    }).then(r=>r.json()).then(console.log).catch(console.error);
-    */
-  }
-
-  function clearDrawn(){
-    drawnItems.clearLayers();
-    showResult('Нарисованные объекты удалены');
-  }
-
-  function escapeHtml(unsafe) {
-    return unsafe ? unsafe.replace(/[&<"'>]/g, function(m){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]; }) : '';
-  }
 
   // --- initial load ---
   loadMapData();
-
-  // ensure map resizes correctly if control panel changes
   setTimeout(()=>map.invalidateSize(), 300);
 
   </script>

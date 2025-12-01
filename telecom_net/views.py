@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from django.db.models import Q, Count, Sum
 from django.http import JsonResponse
 import math
+from django.shortcuts import render
 from .models import InfrastructureObject, CableRoute, ObjectHistory
 from .serializers import (
     InfrastructureObjectSerializer, 
@@ -11,6 +12,12 @@ from .serializers import (
     ObjectHistorySerializer
 )
 
+def map_picker(request):
+    """
+    Рендерит страницу map_picker.html — полная карта.
+    Используется внутри admin iframe (postMessage) и как отдельная страница.
+    """
+    return render(request, "map_picker.html")
 
 class InfrastructureObjectViewSet(viewsets.ModelViewSet):
     queryset = InfrastructureObject.objects.all()
