@@ -16,7 +16,7 @@ class InfrastructureObject(models.Model):
     TECHNOLOGIES = [
         ('gpon', 'GPON'),
         ('adsl', 'ADSL'),
-        ('ethernet', 'Ethernet'),
+        ('ethernet', 'Оптика'),
         ('hybrid', 'Гибридный'),
     ]
 

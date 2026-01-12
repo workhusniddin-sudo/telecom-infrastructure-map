@@ -12,8 +12,17 @@ SECRET_KEY = 'django-insecure-fn3(!30#d_d#vke)-=jklwjl3f)$$-iesq+#b1(k+8dv(fr$#e
 
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0']
+ALLOWED_HOSTS = [
+    'localhost',
+    '127.0.0.1',
+    '0.0.0.0',
+    '192.168.10.21',
+    'bernice-semistiff-roxie.ngrok-free.dev',
+]
 
+CSRF_TRUSTED_ORIGINS = [
+    'https://bernice-semistiff-roxie.ngrok-free.dev',
+]
 
 # ---------------------------
 #       APPS
