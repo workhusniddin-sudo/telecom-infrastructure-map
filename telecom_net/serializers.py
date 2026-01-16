@@ -1,3 +1,4 @@
+from django.urls import reverse
 from rest_framework import serializers
 from .models import InfrastructureObject, CableRoute, ObjectHistory
 
@@ -11,6 +12,8 @@ class InfrastructureObjectSerializer(serializers.ModelSerializer):
     photo_url = serializers.SerializerMethodField()
     diagram_url = serializers.SerializerMethodField()
     children_count = serializers.SerializerMethodField()
+
+    edit_url = serializers.SerializerMethodField()
 
     class Meta:
         model = InfrastructureObject
@@ -28,6 +31,7 @@ class InfrastructureObjectSerializer(serializers.ModelSerializer):
             'notes',
             'is_active',
             'children_count',
+            'edit_url',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
@@ -47,6 +51,10 @@ class InfrastructureObjectSerializer(serializers.ModelSerializer):
     # ❗ Исправленный children_count
     def get_children_count(self, obj):
         return InfrastructureObject.objects.filter(parent=obj).count()
+
+    # ✅ Ссылка на редактирование объекта в Django Admin
+    def get_edit_url(self, obj):
+        return reverse('admin:telecom_net_infrastructureobject_change', args=[obj.id])
 
 
 class CableRouteSerializer(serializers.ModelSerializer):

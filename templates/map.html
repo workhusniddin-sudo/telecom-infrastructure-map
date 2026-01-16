@@ -18,90 +18,369 @@
   <style>
     html,body { height:100%; margin:0; font-family: "Segoe UI", Tahoma, Verdana, sans-serif; background:#f5f5f5; }
     #map { width:100%; height:100vh; }
+
     .control-panel{
       position:absolute; left:12px; top:12px; z-index:1100;
-      width:380px; background:#fff; padding:16px; border-radius:12px;
-      box-shadow:0 6px 24px rgba(0,0,0,0.12);
+      width:380px; background:#fff; padding:14px; border-radius:14px;
+      box-shadow:0 10px 30px rgba(0,0,0,0.14);
       max-height:88vh; overflow:auto;
+      transition: transform 220ms ease, opacity 220ms ease;
+      will-change: transform;
+      touch-action: pan-y;
     }
-    .panel-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
-    .panel-header h2 { margin:0; font-size:1.2rem; color:#243447; }
-    input[type=text], select { width:100%; padding:10px; border-radius:8px; border:1px solid #e6e9ee; margin-bottom:8px; }
-    .btn { display:inline-flex; align-items:center; gap:8px; background:#3498db; color:#fff; padding:9px 12px; border-radius:8px; border:none; cursor:pointer; font-weight:600; }
-    .btn:hover { transform:translateY(-1px) }
-    .btn.small { padding:6px 8px; font-size:0.9rem }
-    .legend { position:absolute; left:12px; bottom:12px; z-index:1100; background:#fff; padding:12px; border-radius:10px; box-shadow:0 6px 18px rgba(0,0,0,0.12); font-size:13px }
-    .legend-item { display:flex; align-items:center; gap:8px; margin:6px 0 }
-    .stat-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; background:#2f3b46; color:#fff; padding:8px; border-radius:8px; font-size:13px }
-    .stat-value { font-weight:700; font-size:1.05rem; color:#7bd389 }
-    .floating-actions { margin-top:10px; display:flex; gap:8px; flex-wrap:wrap }
-    .muted { color:#6b7280; font-size:0.95rem }
-    pre#geojsonOut { max-height:150px; overflow:auto; background:#f7f7f7; padding:8px; border-radius:6px; font-size:12px }
-    /* small indicator for Add-Mode */
-    .add-mode-indicator { display:inline-block; margin-left:8px; font-weight:700; color:#d97706 }
+
+    .panel-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap:10px; }
+    .panel-header h2 { margin:0; font-size:1.15rem; color:#243447; display:flex; align-items:center; gap:10px; }
+
+    .panel-top-actions { display:flex; align-items:center; gap:8px; }
+    .panel-toggle-btn {
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      width:36px;
+      height:36px;
+      border-radius:12px;
+      border:1px solid #e6e9ee;
+      background:#f8fafc;
+      cursor:pointer;
+      font-weight:800;
+      color:#111827;
+    }
+    .panel-toggle-btn:hover { transform: translateY(-1px); }
+
+    .jalousie-handle {
+      width:64px;
+      height:6px;
+      background:#e5e7eb;
+      border-radius:999px;
+      margin:0 auto 10px auto;
+      display:none;
+      cursor:pointer;
+      touch-action: none;
+    }
+
+    input[type=text]{
+      width:100%;
+      padding:11px 12px;
+      border-radius:12px;
+      border:1px solid #e6e9ee;
+      font-size:15px;
+      outline:none;
+    }
+    input[type=text]:focus{ border-color:#93c5fd; box-shadow: 0 0 0 4px rgba(59,130,246,0.12); }
+
+    .muted { color:#6b7280; font-size:0.92rem }
+
+    .panel-fab {
+      position:absolute;
+      left:12px;
+      top:12px;
+      z-index:1200;
+      display:none;
+      border:none;
+      border-radius:14px;
+      padding:10px 12px;
+      background:#111827;
+      color:#fff;
+      font-weight:900;
+      cursor:pointer;
+      box-shadow:0 10px 26px rgba(0,0,0,0.18);
+    }
+    .panel-fab:hover { transform: translateY(-1px); }
+
+    .control-panel.closed {
+      transform: translateX(-110%);
+      opacity: 0.98;
+      pointer-events: none;
+    }
+
+    /* ===== Search dropdown ===== */
+    .search-wrap { position: relative; }
+    .search-dropdown {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: calc(100% - 6px);
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      box-shadow: 0 14px 28px rgba(0,0,0,0.14);
+      overflow: hidden;
+      z-index: 2000;
+      display: none;
+      max-height: 320px;
+      overflow-y: auto;
+    }
+    .search-item {
+      padding: 10px 12px;
+      cursor: pointer;
+      border-bottom: 1px solid #f1f5f9;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .search-item:last-child { border-bottom: none; }
+    .search-item:hover { background: #f8fafc; }
+    .search-title {
+      font-weight: 900;
+      color: #111827;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .search-sub {
+      font-size: 12px;
+      color: #6b7280;
+      line-height: 1.25;
+    }
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 900;
+      background: #eef2ff;
+      color: #3730a3;
+    }
+    .search-empty, .search-loading {
+      padding: 12px;
+      color: #6b7280;
+      font-size: 13px;
+    }
+
+    /* ===== Stats ===== */
+    .stat-grid {
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:10px;
+      margin-top:12px;
+    }
+    .stat-card{
+      background:#0f172a;
+      color:#fff;
+      border-radius:14px;
+      padding:12px;
+      box-shadow: 0 10px 22px rgba(15,23,42,0.18);
+    }
+    .stat-label{ font-size:12px; opacity:0.75; margin-bottom:6px; }
+    .stat-value{ font-size:22px; font-weight:900; letter-spacing:0.3px; }
+
+    /* ===== Layers accordion (“жалюзи”) ===== */
+    .acc {
+      margin-top:12px;
+      border:1px solid #eef2f7;
+      background:#f8fafc;
+      border-radius:14px;
+      overflow:hidden;
+    }
+    .acc-head{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:12px;
+      cursor:pointer;
+      user-select:none;
+    }
+    .acc-title{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      font-weight:900;
+      color:#111827;
+    }
+    .acc-arrow{
+      width:34px;
+      height:34px;
+      border-radius:12px;
+      border:1px solid #e6e9ee;
+      background:#fff;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-weight:900;
+      color:#111827;
+      transition: transform 180ms ease;
+    }
+    .acc.open .acc-arrow{ transform: rotate(180deg); }
+    .acc-body{
+      max-height:0;
+      overflow:hidden;
+      transition:max-height 220ms ease;
+      background:#fff;
+      border-top:1px solid #eef2f7;
+    }
+    .acc.open .acc-body{
+      max-height: 360px;
+    }
+
+    .layer-row {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:10px 12px;
+      border-bottom:1px dashed #e5e7eb;
+      font-size:14px;
+    }
+    .layer-row:last-child { border-bottom:none; }
+    .layer-left { display:flex; align-items:center; gap:10px; }
+    .dot {
+      width:10px; height:10px; border-radius:999px; display:inline-block;
+      box-shadow:0 0 0 2px rgba(255,255,255,0.8);
+      border:1px solid rgba(0,0,0,0.1);
+    }
+    .switch {
+      appearance:none;
+      width:44px; height:24px;
+      border-radius:999px;
+      background:#d1d5db;
+      position:relative;
+      cursor:pointer;
+      outline:none;
+      transition: background 150ms ease;
+      flex:0 0 auto;
+    }
+    .switch:checked { background:#22c55e; }
+    .switch::after{
+      content:'';
+      position:absolute;
+      width:20px; height:20px;
+      border-radius:999px;
+      background:#fff;
+      top:2px; left:2px;
+      transition: transform 150ms ease;
+      box-shadow:0 2px 8px rgba(0,0,0,0.18);
+    }
+    .switch:checked::after { transform: translateX(20px); }
+
+    /* ===== Primary CTA ===== */
+    .cta {
+      margin-top:12px;
+      display:flex;
+      gap:10px;
+    }
+    .btn-cta{
+      flex:1;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:10px;
+      padding:12px 14px;
+      border-radius:14px;
+      border:none;
+      cursor:pointer;
+      font-weight:900;
+      font-size:14px;
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      color:#fff;
+      box-shadow: 0 12px 26px rgba(37,99,235,0.28);
+    }
+    .btn-cta:hover{ transform: translateY(-1px); }
+    .btn-cta:active{ transform: translateY(0px); }
+
+    @media (max-width: 768px) {
+      .control-panel{
+        left:12px;
+        right:12px;
+        width: calc(100% - 24px);
+        top:auto;
+        bottom:12px;
+        max-height:80vh;
+        border-radius:16px;
+        pointer-events: auto;
+      }
+      .jalousie-handle { display:block; }
+      .control-panel.closed {
+        transform: translateY(0);
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .panel-fab { display:none !important; }
+    }
+
+    .dragging {
+      transition: none !important;
+    }
+
+    /* Zoom bottom-right */
+    .leaflet-bottom.leaflet-right .leaflet-control-zoom {
+      margin-right: 12px;
+      margin-bottom: 12px;
+    }
+
+    /* Layers top-right (base only) */
+    .leaflet-top.leaflet-right .leaflet-control-layers {
+      margin-top: 12px;
+      margin-right: 12px;
+    }
+
+    /* ✅ УБРАЛИ любые нижние сообщения */
+    #result { display:none !important; }
   </style>
 </head>
 <body>
 
-  <div class="control-panel">
-    <div class="panel-header">
-      <h2><i class="fas fa-network-wired"></i> Телеком — Худжанд</h2>
-      <div class="muted">ArcGIS Satellite + Leaflet</div>
-    </div>
+  <button id="panelFab" class="panel-fab" onclick="openPanel()">
+    ☰ Панель
+  </button>
 
-    <div>
-      <input id="addressInput" type="text" placeholder="Введите адрес (или координаты) для проверки" />
-      <div style="display:flex; gap:8px; margin-top:6px">
-        <button class="btn" onclick="checkConnection()"><i class="fas fa-search"></i> Проверить</button>
-        <button class="btn small" onclick="locateMe()"><i class="fas fa-crosshairs"></i> Моё местоположение</button>
-        <button class="btn small" onclick="loadMapData()"><i class="fas fa-sync-alt"></i> Обновить</button>
+  <div id="controlPanel" class="control-panel">
+    <div class="jalousie-handle" id="jalousieHandle" title="Свайп вверх/вниз"></div>
+
+    <div class="panel-header" id="panelHeader">
+      <h2>
+        <i class="fas fa-network-wired"></i> Телеком — Худжанд
+      </h2>
+      <div class="panel-top-actions">
+        <button class="panel-toggle-btn" id="panelToggleBtn" title="Открыть/закрыть панель" onclick="togglePanel()">☰</button>
       </div>
     </div>
 
-    <div style="margin-top:10px">
-      <label class="muted">Фильтры</label>
-      <div style="display:flex; gap:8px; margin-top:6px">
-        <select id="objectTypeFilter" onchange="loadMapData()">
-          <option value="">Все типы</option>
-          <option value="olt">OLT</option>
-          <option value="splice_box">Муфта</option>
-          <option value="splitter">Сплиттер</option>
-          <option value="switch">Коммутатор</option>
-          <option value="ats">АТС</option>
-        </select>
-        <select id="technologyFilter" onchange="loadMapData()">
-          <option value="">Все технологии</option>
-          <option value="gpon">GPON</option>
-          <option value="adsl">ADSL</option>
-          <option value="ethernet">Ethernet</option>
-        </select>
+    <!-- ✅ Поиск (живой) -->
+    <div class="search-wrap">
+      <input id="addressInput" type="text" placeholder="Поиск: ID / название / адрес" autocomplete="off" />
+      <div id="searchDropdown" class="search-dropdown"></div>
+    </div>
+
+    <!-- ✅ Stats -->
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-label">Объектов</div>
+        <div class="stat-value" id="statObjects">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Свободных портов</div>
+        <div class="stat-value" id="statFreePorts">0</div>
       </div>
     </div>
 
-    <div class="stat-grid" id="stats" style="margin-top:12px">
-      <div><div class="stat-value" id="statObjects">0</div>Объектов</div>
-      <div><div class="stat-value" id="statFreePorts">0</div>Свободных портов</div>
-    </div>
-
-    <div style="margin-top:10px">
-      <div class="floating-actions">
-        <button class="btn small" id="toggleLabelsBtn" onclick="toggleLabels()"><i class="fas fa-tags"></i> Перекл. подписей</button>
-        <button class="btn small" onclick="exportDrawn()"><i class="fas fa-file-export"></i> Экспорт GeoJSON</button>
-        <button class="btn small" onclick="clearDrawn()"><i class="fas fa-trash"></i> Очистить нарисованное</button>
-        <button class="btn small" id="startAddBtn" onclick="toggleAddMode()"><i class="fas fa-plus-circle"></i> Добавить объект</button>
-        <span id="addModeIndicator" class="add-mode-indicator" style="display:none">Режим: выбрать точку</span>
+    <!-- ✅ Layers accordion -->
+    <div id="layersAccordion" class="acc open">
+      <div class="acc-head" onclick="toggleLayersAccordion()">
+        <div class="acc-title">
+          <i class="fas fa-layer-group"></i>
+          Слои (объекты)
+        </div>
+        <div class="acc-arrow">⌄</div>
       </div>
-      <div style="margin-top:8px" id="result" class="muted">Готово — загрузите данные карты.</div>
+      <div class="acc-body">
+        <div id="layerToggles"></div>
+      </div>
     </div>
 
-  </div>
+    <!-- ✅ Primary CTA -->
+    <div class="cta">
+      <button class="btn-cta" id="startAddBtn" onclick="toggleAddMode()">
+        <i class="fas fa-plus-circle"></i>
+        Добавить объект
+      </button>
+    </div>
 
-  <div class="legend" id="legend">
-    <div style="font-weight:700; margin-bottom:6px">Легенда</div>
-    <div class="legend-item"><span style="color:#e74c3c">●</span> OLT</div>
-    <div class="legend-item"><span style="color:#3498db">●</span> Муфта</div>
-    <div class="legend-item"><span style="color:#27ae60">●</span> Сплиттер</div>
-    <div class="legend-item"><span style="color:#f39c12">●</span> Коммутатор</div>
+    <!-- скрытый элемент: оставляем в DOM, но скрываем стилем -->
+    <div id="result" class="muted"> </div>
+    <span id="addModeIndicator" class="add-mode-indicator" style="display:none">Режим: выбрать точку</span>
   </div>
 
   <div id="map"></div>
@@ -112,19 +391,22 @@
   <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
 
   <script>
-  // --- init map (centered on Худжанд) ---
-  var map = L.map('map', { center: [40.291, 69.622], zoom: 14, minZoom: 4 });
+  // Map init
+  var map = L.map('map', { center: [40.291, 69.622], zoom: 14, minZoom: 4, zoomControl: false });
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-  // --- base layers ---
+  // Base layers
   var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' });
   var arcgisSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 20, attribution: 'Tiles © Esri — Source: Esri, Maxar' }).addTo(map);
+
+  // (подписи оставляем как возможность потом, но UI нет)
   var arcgisLabels = L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { maxZoom: 20, attribution: 'Labels © Esri' });
 
+  // ✅ Правое окно: только 2 карты
   var baseMaps = { "🛰 Спутник (ArcGIS)": arcgisSatellite, "🗺 Стандартная (OSM)": osm };
-  var overlayMaps = { "Подписи (ArcGIS Labels)": arcgisLabels };
-  L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
+  L.control.layers(baseMaps, null, { collapsed: false, position: 'topright' }).addTo(map);
 
-  // marker clusters and layers
+  // Layers storage
   var markerClusters = {};
   var cableRoutesLayer = L.layerGroup().addTo(map);
 
@@ -138,6 +420,12 @@
     'client': { color:'#34495e', label:'Клиент' }
   };
 
+  function escapeHtml(unsafe){
+    return unsafe ? unsafe.replace(/[&<"'>]/g, function(m){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m];
+    }) : '';
+  }
+
   function makeSvgIcon(color, letter) {
     var svg = encodeURIComponent(`
       <svg xmlns="http://www.w3.org/2000/svg" width="42" height="42" viewBox="0 0 42 42">
@@ -149,139 +437,500 @@
     return L.icon({ iconUrl: 'data:image/svg+xml;charset=utf-8,' + svg, iconSize: [28,42], iconAnchor: [14,42], popupAnchor: [0,-36] });
   }
 
-  // pre-create clusters and add overlays
-  Object.keys(typeConfig).forEach(function(t) {
-    markerClusters[t] = L.markerClusterGroup({ chunkedLoading: true, maxClusterRadius: 50 });
-    overlayMaps[typeConfig[t].label + ' (слой)'] = markerClusters[t];
-  });
-  // re-create control to include overlay maps
-  document.querySelectorAll('.leaflet-control-layers').forEach(e=>e.remove());
-  L.control.layers(baseMaps, overlayMaps, { collapsed:false }).addTo(map);
+  function typeLabel(t) {
+    if (typeConfig[t] && typeConfig[t].label) return typeConfig[t].label;
+    return t || '—';
+  }
 
-  // popup html builder
+  function renderLayerToggles() {
+    var host = document.getElementById('layerToggles');
+    host.innerHTML = '';
+    Object.keys(typeConfig).forEach(function(t) {
+      var cfg = typeConfig[t];
+      var row = document.createElement('div');
+      row.className = 'layer-row';
+
+      var left = document.createElement('div');
+      left.className = 'layer-left';
+      var dot = document.createElement('span');
+      dot.className = 'dot';
+      dot.style.background = cfg.color;
+
+      var label = document.createElement('div');
+      label.innerText = cfg.label;
+
+      left.appendChild(dot);
+      left.appendChild(label);
+
+      var sw = document.createElement('input');
+      sw.type = 'checkbox';
+      sw.className = 'switch';
+      sw.checked = true;
+      sw.addEventListener('change', function() {
+        if (sw.checked) {
+          markerClusters[t].addTo(map);
+        } else {
+          map.removeLayer(markerClusters[t]);
+        }
+        updateStatsFromCurrentLayers();
+      });
+
+      row.appendChild(left);
+      row.appendChild(sw);
+
+      host.appendChild(row);
+    });
+  }
+
   function makePopupHtml(obj) {
+    var adminEditUrl = '/admin/telecom_net/infrastructureobject/' + encodeURIComponent(obj.id) + '/change/';
     return `
       <div style="min-width:200px">
-        <div style="font-weight:700; margin-bottom:6px;">${obj.name}</div>
+        <div style="font-weight:900; margin-bottom:6px;">${escapeHtml(obj.name || 'Объект')}</div>
         <div style="font-size:13px">
-          <b>ID:</b> ${obj.object_id}<br/>
-          <b>Тип:</b> ${obj.object_type_display || obj.object_type}<br/>
-          <b>Технология:</b> ${obj.technology_display || obj.technology || '—'}<br/>
-          <b>Порты:</b> ${obj.free_ports}/${obj.capacity}<br/>
-          <b>Адрес:</b> ${obj.address || '—'}
+          <b>ID:</b> ${escapeHtml(String(obj.object_id || '—'))}<br/>
+          <b>Тип:</b> ${escapeHtml(String(obj.object_type_display || obj.object_type || '—'))}<br/>
+          <b>Технология:</b> ${escapeHtml(String(obj.technology_display || obj.technology || '—'))}<br/>
+          <b>Порты:</b> ${escapeHtml(String((obj.free_ports ?? '—') + '/' + (obj.capacity ?? '—')))}<br/>
+          <b>Адрес:</b> ${escapeHtml(String(obj.address || '—'))}
+        </div>
+        <div style="margin-top:10px;">
+          <a href="${adminEditUrl}" target="_blank" rel="noopener"
+             style="display:inline-block; padding:7px 10px; border-radius:10px; background:#2563eb; color:#fff; text-decoration:none; font-weight:900; font-size:13px;">
+            ✏️ Редактировать
+          </a>
         </div>
       </div>
     `;
   }
 
-  // load data from API
+  // ✅ Статистика считается по данным, загруженным на карту
+  var allLoadedObjects = [];
+
+  function updateStatsFromCurrentLayers() {
+    // считаем только по тем слоям, которые видим на карте
+    var visibleTypes = Object.keys(markerClusters).filter(function(t){
+      return map.hasLayer(markerClusters[t]);
+    });
+
+    var visibleObjects = allLoadedObjects.filter(function(o){
+      var t = o.object_type || 'building';
+      return visibleTypes.indexOf(t) !== -1;
+    });
+
+    var totalObjects = visibleObjects.length;
+
+    var freePortsSum = 0;
+    visibleObjects.forEach(function(o){
+      var fp = Number(o.free_ports);
+      if (!isNaN(fp)) freePortsSum += fp;
+    });
+
+    document.getElementById('statObjects').innerText = String(totalObjects);
+    document.getElementById('statFreePorts').innerText = String(freePortsSum);
+  }
+
+  // Load data (без фильтров)
   function loadMapData(){
-    showResult('Загрузка данных...');
-    showLoading(true);
-    const objectType = document.getElementById('objectTypeFilter').value;
-    const technology = document.getElementById('technologyFilter').value;
-    let url = '/api/map-data/';
-    const params = new URLSearchParams();
-    if (objectType) params.append('object_type', objectType);
-    if (technology) params.append('technology', technology);
-    if (params.toString()) url += '?' + params.toString();
+    fetch('/api/map-data/')
+      .then(function(r){
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function(data){
+        clearMap();
+        allLoadedObjects = (data && data.infrastructure_objects) ? data.infrastructure_objects : [];
 
-    fetch(url).then(r => {
-      if (!r.ok) throw new Error('Ошибка загрузки данных: ' + r.status);
-      return r.json();
-    }).then(data => {
-      clearMap();
-      (data.infrastructure_objects || []).forEach(obj => {
-        const t = obj.object_type || 'building';
-        const cfg = typeConfig[t] || { color:'#95a5a6', label:t };
-        const letter = (cfg.label || t).slice(0,1).toUpperCase();
-        const icon = makeSvgIcon(cfg.color, letter);
-        const m = L.marker([obj.lat, obj.lng], { icon: icon }).bindPopup(makePopupHtml(obj));
-        m._meta = { id: obj.id, objectData: obj };
-        markerClusters[t].addLayer(m);
+        allLoadedObjects.forEach(function(obj){
+          var t = obj.object_type || 'building';
+          var cfg = typeConfig[t] || { color:'#95a5a6', label:t };
+          var letter = (cfg.label || t).slice(0,1).toUpperCase();
+          var icon = makeSvgIcon(cfg.color, letter);
+          var m = L.marker([obj.lat, obj.lng], { icon: icon }).bindPopup(makePopupHtml(obj));
+          m._meta = { id: obj.id, objectData: obj };
+
+          if (!markerClusters[t]) {
+            markerClusters[t] = L.markerClusterGroup({ chunkedLoading: true, maxClusterRadius: 50 });
+          }
+          markerClusters[t].addLayer(m);
+        });
+
+        Object.keys(markerClusters).forEach(function(k){
+          if (!map.hasLayer(markerClusters[k])) markerClusters[k].addTo(map);
+        });
+
+        updateStatsFromCurrentLayers();
+      })
+      .catch(function(err){
+        console.error(err);
+        // Ошибки в UI не показываем (по требованию)
       });
-      Object.keys(markerClusters).forEach(k => {
-        if (!map.hasLayer(markerClusters[k])) markerClusters[k].addTo(map);
-      });
-      (data.cable_routes || []).forEach(route => {
-        if (route.from_object && route.to_object) {
-          const latlngs = [[route.from_object.lat, route.from_object.lng],[route.to_object.lat, route.to_object.lng]];
-          var poly = L.polyline(latlngs, { color:'#2a9df4', weight:3, opacity:0.8 }).bindPopup(`<div style="font-weight:700">${route.name}</div><div>${route.length} м</div>`);
-          cableRoutesLayer.addLayer(poly);
-        }
-      });
-      updateStats();
-      showResult('Данные загружены', 'success');
-    }).catch(err => { console.error(err); showResult('Ошибка загрузки карты: ' + err.message, 'error'); })
-      .finally(()=>showLoading(false));
   }
 
-  // locate me
-  function locateMe(){ showResult('Определяю местоположение...'); map.locate({ setView:true, maxZoom:16, watch:false }); }
-  map.on('locationfound', function(e){ L.circle(e.latlng, { radius: Math.max(e.accuracy,20), color:'#2ecc71', weight:1, fillOpacity:0.1 }).addTo(map); showResult('Местоположение найдено','success'); });
-  map.on('locationerror', function(){ showResult('Не удалось определить местоположение','error'); });
-
-  var labelsVisible = false;
-  function toggleLabels(){ labelsVisible = !labelsVisible; if (labelsVisible) { arcgisLabels.addTo(map); document.getElementById('toggleLabelsBtn').innerText='Откл. подписи'; } else { map.removeLayer(arcgisLabels); document.getElementById('toggleLabelsBtn').innerText='Перекл. подписей'; } }
-
-  function checkConnection(){
-    var q = document.getElementById('addressInput').value.trim();
-    if (!q) { showResult('Введите адрес для проверки','error'); return; }
-    showResult('Проверка подключения...'); showLoading(true);
-    fetch('/api/check-connection/?address=' + encodeURIComponent(q))
-      .then(r => r.json()).then(data => {
-        showResult(data.message, data.available ? 'success' : 'error');
-        if (data.nearest_objects && data.nearest_objects.length) highlightNearest(data.nearest_objects);
-      }).catch(err=>{ console.error(err); showResult('Ошибка проверки подключения','error'); })
-      .finally(()=>showLoading(false));
+  function clearMap(){
+    Object.keys(markerClusters).forEach(function(k){
+      try{ markerClusters[k].clearLayers(); }catch(e){}
+    });
+    cableRoutesLayer.clearLayers();
   }
 
-  function highlightNearest(list){ list.forEach(o=>{ var m=L.circleMarker([o.lat,o.lng],{ radius:10, color:'#f1c40f', fillColor:'#f1c40f', weight:2, fillOpacity:0.9 }).addTo(map); m.bindPopup(`<b>${o.name}</b><br>Порты: ${o.free_ports}/${o.capacity}`).openPopup(); setTimeout(()=>map.removeLayer(m),8000); }); }
-
-  function updateStats(){ fetch('/api/infrastructure/stats/').then(r=>r.json()).then(s=>{ document.getElementById('statObjects').innerText = s.total_objects || 0; document.getElementById('statFreePorts').innerText = s.total_free_ports || 0; }).catch(e=>console.warn('stats err', e)); }
-
-  function clearMap(){ Object.keys(markerClusters).forEach(k=>{ try{ markerClusters[k].clearLayers(); }catch(e){} }); cableRoutesLayer.clearLayers(); }
-
-  function showLoading(flag){ var el = document.getElementById('result'); el.style.opacity = flag ? 0.6 : 1; }
-  function showResult(msg, type){ var el=document.getElementById('result'); el.innerText = msg; if(type==='success') el.style.color='#16a34a'; else if(type==='error') el.style.color='#dc2626'; else el.style.color='#374151'; }
-
-  // Drawing
-  var drawnItems = new L.FeatureGroup().addTo(map);
-  var drawControl = new L.Control.Draw({ position:'topright', draw:{ polygon:false, rectangle:false, circle:false, marker:false, circlemarker:false, polyline:{ shapeOptions:{ color:'#ff7b00', weight:4 } } }, edit:{ featureGroup:drawnItems, remove:true } });
-  map.addControl(drawControl);
-  map.on(L.Draw.Event.CREATED, function(e){ var layer = e.layer; drawnItems.addLayer(layer); var name = prompt("Название трассы (опционально):",""); if(name){ layer.bindPopup("<b>"+escapeHtml(name)+"</b>").openPopup(); } layer.feature = layer.feature||{}; layer.feature.type="Feature"; layer.feature.properties = layer.feature.properties||{}; layer.feature.properties.name = name || ''; });
-
-  map.on('draw:edited', function(e){ showResult('Отредактировано ' + e.layers.getLayers().length + ' объектов', 'success'); });
-
-  function exportDrawn(){ var geojson = drawnItems.toGeoJSON(); var text = JSON.stringify(geojson, null, 2); var w=window.open("","_blank"); w.document.write("<pre>"+escapeHtml(text)+"</pre>"); }
-
-  function clearDrawn(){ drawnItems.clearLayers(); showResult('Нарисованные объекты удалены'); }
-
-  function escapeHtml(unsafe){ return unsafe ? unsafe.replace(/[&<"'>]/g, function(m){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]; }) : ''; }
-
-  // ---- Add-Mode: нажатие по карте откроет страницу админки add с GET параметрами lat,lng
+  // ===== Add mode (красивая кнопка) =====
   var addMode = false;
   function toggleAddMode(){
     addMode = !addMode;
-    document.getElementById('addModeIndicator').style.display = addMode ? 'inline-block' : 'none';
-    document.getElementById('startAddBtn').innerText = addMode ? 'Отмена' : 'Добавить объект';
+    document.getElementById('startAddBtn').innerHTML = addMode
+      ? '<i class="fas fa-times-circle"></i> Отмена добавления'
+      : '<i class="fas fa-plus-circle"></i> Добавить объект';
+    document.getElementById('startAddBtn').style.background = addMode
+      ? 'linear-gradient(135deg, #ef4444, #dc2626)'
+      : 'linear-gradient(135deg, #2563eb, #1d4ed8)';
   }
 
   map.on('click', function(e){
     if (!addMode) return;
     var lat = e.latlng.lat.toFixed(6);
     var lng = e.latlng.lng.toFixed(6);
-    // Открываем страницу админки в новом окне с GET параметрами
     var adminUrl = '/admin/telecom_net/infrastructureobject/add/?lat=' + encodeURIComponent(lat) + '&lng=' + encodeURIComponent(lng);
-    // Открыть в новой вкладке:
     window.open(adminUrl, '_blank');
-    // выключаем режим
     toggleAddMode();
   });
 
-  // --- initial load ---
+  // ===== Layers accordion =====
+  function toggleLayersAccordion(){
+    var acc = document.getElementById('layersAccordion');
+    acc.classList.toggle('open');
+  }
+
+  // ===== Live Search -> admin edit =====
+  var addressInput = document.getElementById('addressInput');
+  var searchDropdown = document.getElementById('searchDropdown');
+
+  var searchTimer = null;
+  var searchAbort = null;
+
+  function hideSearchDropdown() {
+    searchDropdown.style.display = 'none';
+    searchDropdown.innerHTML = '';
+  }
+  function showSearchLoading() {
+    searchDropdown.style.display = 'block';
+    searchDropdown.innerHTML = '<div class="search-loading">Поиск...</div>';
+  }
+  function showSearchEmpty() {
+    searchDropdown.style.display = 'block';
+    searchDropdown.innerHTML = '<div class="search-empty">Ничего не найдено</div>';
+  }
+
+  function focusAndOpenObject(obj) {
+    try {
+      if (obj && typeof obj.lat === 'number' && typeof obj.lng === 'number') {
+        map.setView([obj.lat, obj.lng], Math.max(map.getZoom(), 16), { animate: true });
+      }
+    } catch (e) {}
+    var adminEditUrl = '/admin/telecom_net/infrastructureobject/' + encodeURIComponent(obj.id) + '/change/';
+    window.open(adminEditUrl, '_blank');
+  }
+
+  function renderSearchResults(objects) {
+    if (!objects || !objects.length) {
+      showSearchEmpty();
+      return;
+    }
+    searchDropdown.style.display = 'block';
+    searchDropdown.innerHTML = '';
+
+    objects.slice(0, 20).forEach(function(obj) {
+      var t = obj.object_type || '';
+      var pill = '<span class="pill">' + escapeHtml(typeLabel(t)) + '</span>';
+
+      var title = (obj.name || 'Без названия');
+      var sub = [];
+      if (obj.object_id) sub.push('ID: ' + escapeHtml(String(obj.object_id)));
+      if (obj.address) sub.push(escapeHtml(String(obj.address)));
+
+      var item = document.createElement('div');
+      item.className = 'search-item';
+      item.innerHTML = ''
+        + '<div class="search-title">' + pill + '<span>' + escapeHtml(title) + '</span></div>'
+        + '<div class="search-sub">' + sub.join(' • ') + '</div>';
+
+      item.addEventListener('click', function() {
+        hideSearchDropdown();
+        addressInput.blur();
+        focusAndOpenObject(obj);
+      });
+
+      searchDropdown.appendChild(item);
+    });
+  }
+
+  function doLiveSearch(text) {
+    var q = (text || '').trim();
+    if (q.length < 2) {
+      hideSearchDropdown();
+      return;
+    }
+
+    if (searchAbort) {
+      try { searchAbort.abort(); } catch (e) {}
+    }
+    searchAbort = new AbortController();
+
+    showSearchLoading();
+
+    fetch('/api/search/?q=' + encodeURIComponent(q), { signal: searchAbort.signal })
+      .then(function(r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function(data) {
+        var objs = (data && data.infrastructure_objects) ? data.infrastructure_objects : [];
+        renderSearchResults(objs);
+      })
+      .catch(function(err) {
+        if (err && err.name === 'AbortError') return;
+        console.error(err);
+        showSearchEmpty();
+      });
+  }
+
+  addressInput.addEventListener('input', function() {
+    var val = addressInput.value || '';
+    if (searchTimer) clearTimeout(searchTimer);
+    searchTimer = setTimeout(function() {
+      doLiveSearch(val);
+    }, 200);
+  });
+
+  document.addEventListener('click', function(e) {
+    if (!searchDropdown.contains(e.target) && e.target !== addressInput) {
+      hideSearchDropdown();
+    }
+  });
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') hideSearchDropdown();
+  });
+
+  // ===== Panel jalousie (desktop + mobile drag+snap) =====
+  var controlPanel = document.getElementById('controlPanel');
+  var panelFab = document.getElementById('panelFab');
+  var jalousieHandle = document.getElementById('jalousieHandle');
+  var panelHeader = document.getElementById('panelHeader');
+
+  function isMobile() {
+    return window.matchMedia('(max-width: 768px)').matches;
+  }
+
+  function applyFabVisibility() {
+    if (isMobile()) {
+      panelFab.style.display = 'none';
+      return;
+    }
+    if (controlPanel.classList.contains('closed')) {
+      panelFab.style.display = 'inline-block';
+    } else {
+      panelFab.style.display = 'none';
+    }
+  }
+
+  function closePanelDesktop() {
+    controlPanel.classList.add('closed');
+    localStorage.setItem('panel_closed', '1');
+    applyFabVisibility();
+    setTimeout(function(){ map.invalidateSize(); }, 250);
+  }
+
+  function openPanelDesktop() {
+    controlPanel.classList.remove('closed');
+    localStorage.setItem('panel_closed', '0');
+    applyFabVisibility();
+    setTimeout(function(){ map.invalidateSize(); }, 250);
+  }
+
+  var mobileY = 0;
+  var mobileOpenY = 0;
+  var mobileClosedY = 0;
+  var mobilePeek = 72;
+
+  var dragging = false;
+  var startY = 0;
+  var startPanelY = 0;
+  var lastY = 0;
+  var lastT = 0;
+  var velocity = 0;
+
+  function clamp(v, min, max) {
+    return Math.max(min, Math.min(max, v));
+  }
+
+  function measureMobilePositions() {
+    var rect = controlPanel.getBoundingClientRect();
+    var panelH = rect.height;
+    mobileOpenY = 0;
+    mobileClosedY = Math.max(0, panelH - mobilePeek);
+    mobileY = clamp(mobileY, mobileOpenY, mobileClosedY);
+  }
+
+  function setMobileTransform(y) {
+    mobileY = clamp(y, mobileOpenY, mobileClosedY);
+    controlPanel.style.transform = 'translateY(' + mobileY + 'px)';
+  }
+
+  function snapMobile(toOpen) {
+    controlPanel.classList.remove('dragging');
+    controlPanel.style.transition = 'transform 220ms ease';
+    if (toOpen) {
+      setMobileTransform(mobileOpenY);
+      localStorage.setItem('panel_closed', '0');
+    } else {
+      setMobileTransform(mobileClosedY);
+      localStorage.setItem('panel_closed', '1');
+    }
+    setTimeout(function(){
+      controlPanel.style.transition = '';
+      map.invalidateSize();
+    }, 250);
+  }
+
+  function initMobileState() {
+    measureMobilePositions();
+    var saved = localStorage.getItem('panel_closed');
+    if (saved === null) {
+      setMobileTransform(mobileClosedY);
+      localStorage.setItem('panel_closed', '1');
+    } else {
+      if (saved === '1') setMobileTransform(mobileClosedY);
+      else setMobileTransform(mobileOpenY);
+    }
+  }
+
+  function canStartDragFromTarget(target) {
+    if (target === jalousieHandle) return true;
+    if (panelHeader.contains(target)) return true;
+    return false;
+  }
+
+  function onDragStart(e) {
+    if (!isMobile()) return;
+    var target = e.target;
+    if (!canStartDragFromTarget(target)) return;
+
+    dragging = true;
+    controlPanel.classList.add('dragging');
+    controlPanel.style.transition = 'none';
+
+    measureMobilePositions();
+
+    startY = (e.touches && e.touches.length) ? e.touches[0].clientY : e.clientY;
+    startPanelY = mobileY;
+
+    lastY = startY;
+    lastT = performance.now();
+    velocity = 0;
+
+    controlPanel.style.overflow = 'hidden';
+
+    if (e.pointerId !== undefined) {
+      try { controlPanel.setPointerCapture(e.pointerId); } catch(err) {}
+    }
+  }
+
+  function onDragMove(e) {
+    if (!dragging || !isMobile()) return;
+    var y = (e.touches && e.touches.length) ? e.touches[0].clientY : e.clientY;
+    var dy = y - startY;
+    var nextY = startPanelY + dy;
+
+    var now = performance.now();
+    var dt = Math.max(1, now - lastT);
+    velocity = (y - lastY) / dt;
+
+    lastY = y;
+    lastT = now;
+
+    setMobileTransform(nextY);
+
+    if (e.cancelable) e.preventDefault();
+  }
+
+  function onDragEnd() {
+    if (!dragging || !isMobile()) return;
+    dragging = false;
+
+    controlPanel.style.overflow = 'auto';
+    controlPanel.classList.remove('dragging');
+
+    var SNAP_THRESHOLD = 0.25;
+
+    if (velocity > SNAP_THRESHOLD) { snapMobile(false); return; }
+    if (velocity < -SNAP_THRESHOLD) { snapMobile(true); return; }
+
+    var midpoint = mobileClosedY / 2;
+    if (mobileY <= midpoint) snapMobile(true);
+    else snapMobile(false);
+  }
+
+  function togglePanel() {
+    if (isMobile()) {
+      var isClosed = mobileY > (mobileClosedY * 0.6);
+      snapMobile(isClosed);
+    } else {
+      if (controlPanel.classList.contains('closed')) openPanelDesktop();
+      else closePanelDesktop();
+    }
+  }
+
+  jalousieHandle.addEventListener('click', function(){
+    if (!isMobile()) return;
+    togglePanel();
+  });
+
+  controlPanel.addEventListener('touchstart', onDragStart, { passive: false });
+  controlPanel.addEventListener('touchmove', onDragMove, { passive: false });
+  controlPanel.addEventListener('touchend', onDragEnd, { passive: true });
+  controlPanel.addEventListener('touchcancel', onDragEnd, { passive: true });
+
+  controlPanel.addEventListener('pointerdown', onDragStart, { passive: false });
+  controlPanel.addEventListener('pointermove', onDragMove, { passive: false });
+  controlPanel.addEventListener('pointerup', onDragEnd, { passive: true });
+  controlPanel.addEventListener('pointercancel', onDragEnd, { passive: true });
+
+  function openPanel() { if (isMobile()) snapMobile(true); else openPanelDesktop(); }
+
+  window.addEventListener('resize', function(){
+    if (isMobile()) {
+      controlPanel.classList.remove('closed');
+      initMobileState();
+    } else {
+      controlPanel.style.transform = '';
+      controlPanel.style.transition = '';
+      var saved = localStorage.getItem('panel_closed');
+      if (saved === '1') closePanelDesktop();
+      else openPanelDesktop();
+      applyFabVisibility();
+    }
+    setTimeout(function(){ map.invalidateSize(); }, 250);
+  });
+
+  (function initPanelState(){
+    if (isMobile()) {
+      controlPanel.classList.remove('closed');
+      controlPanel.style.transform = 'translateY(0px)';
+      initMobileState();
+      applyFabVisibility();
+    } else {
+      var saved = localStorage.getItem('panel_closed');
+      if (saved === '1') closePanelDesktop();
+      else openPanelDesktop();
+      applyFabVisibility();
+    }
+  })();
+
+  // Init
+  renderLayerToggles();
   loadMapData();
-  setTimeout(()=>map.invalidateSize(), 300);
+  setTimeout(function(){ map.invalidateSize(); }, 300);
 
   </script>
 </body>
